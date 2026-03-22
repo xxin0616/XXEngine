@@ -22,7 +22,7 @@
       "name": "DamagedHelmet",
       "loaders": "gltf",
       "modelpath": "./DamagedHelmet/glTF/DamagedHelmet.gltf",
-      "opengl_rotation_deg": [ 0.0, 180.0, 180.0 ],
+      "opengl_rotation_deg": [ 0.0, 90.0, 180.0 ],
       "shaders": ["2","1"],
       "texturespath": [
         "./DamagedHelmet/glTF/Default_albedo.jpg",

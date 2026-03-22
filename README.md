@@ -18,8 +18,8 @@ XXEngine 是一个基于 C++ 的图形学项目，当前集成了两条渲染后
   - 模型加载与显示（当前支持 OBJ 与 glTF）
   - 纹理显示与 Blinn-Phong / PBR shader 路径
   - 基于 `models.json` 的模型可用 Shader 列表切换
-  - 鼠标/键盘交互（相机平移、模型平移/旋转）
-  - 工具栏支持一键重置与自动旋转开关
+  - 鼠标/键盘交互（相机平移、光源平移、模型平移/旋转）
+  - 工具栏支持 `Reset`、`Auto Rotate` 与光源拖动模式切换
 
 ## 效果展示
 
@@ -37,25 +37,39 @@ XXEngine 是一个基于 C++ 的图形学项目，当前集成了两条渲染后
       <sub>图 2：软光栅化器渲染演示</sub>
     </td>
     <td align="center" width="33%">
-      <img src="readme_files/OpenGL+blinnPhong.gif" alt="OpenGL Blinn-Phong 演示" width="100%" />
+      <img src="readme_files/OpenGL+blinnPhong.gif" alt="OpenGL 交互演示" width="100%" />
       <br/>
-      <sub>图 3：OpenGL Blinn-Phong 演示</sub>
+      <sub>图 3：OpenGL 交互演示</sub>
     </td>
   </tr>
 </table>
 
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <img src="readme_files/BlinnPhong.gif" alt="Blinn-Phong 动态演示" width="100%" />
+      <br/>
+      <sub>图 4：Blinn-Phong 动态效果</sub>
+    </td>
+    <td align="center" width="50%">
+      <img src="readme_files/pbr.gif" alt="PBR 动态演示" width="100%" />
+      <br/>
+      <sub>图 5：PBR 动态效果</sub>
+    </td>
+  </tr>
+</table>
 
 <table>
   <tr>
     <td align="center" width="50%">
       <img src="readme_files/blinnphong对比图.png" alt="Blinn-Phong 对比图" width="100%" />
       <br/>
-      <sub>图 4：Blinn-Phong 效果对比</sub>
+      <sub>图 6：Blinn-Phong 效果对比</sub>
     </td>
     <td align="center" width="50%">
-      <img src="readme_files/bump对比图.png" alt="Bump 对比图" width="100%" />
+      <img src="readme_files/pbr对比图.jpeg" alt="PBR 对比图" width="100%" />
       <br/>
-      <sub>图 5：Bump 效果对比</sub>
+      <sub>图 7：PBR 效果对比</sub>
     </td>
   </tr>
 </table>
@@ -63,14 +77,24 @@ XXEngine 是一个基于 C++ 的图形学项目，当前集成了两条渲染后
 <table>
   <tr>
     <td align="center" width="50%">
-      <img src="readme_files/MSAA对比图.png" alt="MSAA 对比图" width="100%" />
+      <img src="readme_files/bump对比图.png" alt="Bump 对比图" width="100%" />
       <br/>
-      <sub>图 6：MSAA 效果对比</sub>
+      <sub>图 8：Bump 效果对比</sub>
     </td>
     <td align="center" width="50%">
+      <img src="readme_files/MSAA对比图.png" alt="MSAA 对比图" width="100%" />
+      <br/>
+      <sub>图 9：MSAA 效果对比</sub>
+    </td>
+  </tr>
+</table>
+
+<table>
+  <tr>
+    <td align="center" width="100%">
       <img src="readme_files/贝塞尔曲线的抗锯齿对比图.png" alt="贝塞尔曲线抗锯齿对比图" width="100%" />
       <br/>
-      <sub>图 7：贝塞尔曲线抗锯齿效果对比</sub>
+      <sub>图 10：贝塞尔曲线抗锯齿效果对比</sub>
     </td>
   </tr>
 </table>
@@ -124,18 +148,21 @@ XXEngine/
   - `Shader`（OpenGL）：位于 `Models` 下方，仅显示当前模型支持的 shader（来自 `models.json`）
 - 右侧渲染区域
   - Raster：显示软光栅化结果
-  - OpenGL：显示实时渲染结果与工具栏（重置/自动旋转）
+  - OpenGL：显示实时渲染结果与工具栏（Reset / Auto Rotate / 光源拖动模式）
 
 OpenGL 交互（当前逻辑）：
 
-- 鼠标左键拖动：移动相机
+- 鼠标左键拖动：
+  - 未勾选 `LMB Drag Moves Light`：移动相机
+  - 勾选 `LMB Drag Moves Light`：移动光源位置（X/Y）
 - 鼠标右键拖动：旋转模型
 - `W/A/S/D`：移动模型
 - `Ctrl + W/A/S/D`：旋转模型
 - `Ctrl + 鼠标移动`：旋转模型
 - 工具栏按钮：
-  - `Reset Camera/Model`：重置相机和模型位姿
+  - `Reset`：重置相机、模型和光源位置
   - `Auto Rotate`：自动旋转开关
+  - `LMB Drag Moves Light`：左键拖动切换为移动光源
 
 ## 模型配置（models.json）
 

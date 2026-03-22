@@ -127,6 +127,11 @@ float g_model_rotate_y_deg = 0.0f;
 bool g_auto_rotate_model = false;
 bool g_camera_dragging = false;
 bool g_model_rotating = false;
+bool g_light_dragging = false;
+bool g_move_light_with_lmb = false;
+float g_light_pos_x = 1.8f;
+float g_light_pos_y = 2.2f;
+float g_light_pos_z = 2.5f;
 
 GlFns g_gl;
 std::unordered_map<int, GLuint> g_shader_program_by_effect;
@@ -138,6 +143,9 @@ void ResetCameraAndModelPose() {
     g_model_offset_y = 0.0f;
     g_model_rotate_x_deg = 0.0f;
     g_model_rotate_y_deg = 0.0f;
+    g_light_pos_x = 1.8f;
+    g_light_pos_y = 2.2f;
+    g_light_pos_z = 2.5f;
 }
 
 void HandleInput(bool hovered) {
@@ -151,11 +159,13 @@ void HandleInput(bool hovered) {
     }
 
     if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
-        g_camera_dragging = true;
+        g_move_light_with_lmb ? (g_light_dragging = true) : (g_camera_dragging = true);
     if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
         g_model_rotating = true;
-    if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
+    if (!ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
         g_camera_dragging = false;
+        g_light_dragging = false;
+    }
     if (!ImGui::IsMouseDown(ImGuiMouseButton_Right))
         g_model_rotating = false;
 
@@ -176,6 +186,14 @@ void HandleInput(bool hovered) {
             g_model_rotate_y_deg -= 360.0f;
         else if (g_model_rotate_y_deg < -360.0f)
             g_model_rotate_y_deg += 360.0f;
+    }
+
+    if (g_light_dragging) {
+        const float light_drag_sensitivity = 0.012f;
+        g_light_pos_x += io.MouseDelta.x * light_drag_sensitivity;
+        g_light_pos_y -= io.MouseDelta.y * light_drag_sensitivity;
+        g_light_pos_x = std::clamp(g_light_pos_x, -10.0f, 10.0f);
+        g_light_pos_y = std::clamp(g_light_pos_y, -10.0f, 10.0f);
     }
 
     const bool ctrl_down = io.KeyCtrl || ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_RightCtrl);
@@ -550,7 +568,7 @@ GLuint BeginShadingProgram(bool use_texture) {
                 g_gl.Uniform1i(loc_has_emissive, g_loaded_mesh.has_pbr_texture[4] ? 1 : 0);
 
             if (loc_light_pos >= 0)
-                g_gl.Uniform3f(loc_light_pos, 1.8f, 2.2f, 2.5f);
+                g_gl.Uniform3f(loc_light_pos, g_light_pos_x, g_light_pos_y, g_light_pos_z);
             if (loc_light_color >= 0)
                 g_gl.Uniform3f(loc_light_color, 12.0f, 12.0f, 12.0f);
             if (loc_ambient >= 0)
@@ -590,7 +608,7 @@ GLuint BeginShadingProgram(bool use_texture) {
     if (loc_shine >= 0)
         g_gl.Uniform1f(loc_shine, 64.0f);
     if (loc_light >= 0)
-        g_gl.Uniform3f(loc_light, 1.8f, 2.2f, 2.5f);
+        g_gl.Uniform3f(loc_light, g_light_pos_x, g_light_pos_y, g_light_pos_z);
 
     return blinn_program;
 }
@@ -769,7 +787,7 @@ void OpenGLFeature::RenderInImGuiChild(int model_index) {
     const std::string title = std::string("OpenGL backend MVP: ") + (model_name ? model_name : "model");
     ImGui::TextUnformatted(title.c_str());
 
-    const char* reset_label = "Reset Camera/Model";
+    const char* reset_label = "Reset";
     const char* auto_label = g_auto_rotate_model ? "Stop Auto Rotate" : "Auto Rotate";
     const ImVec2 text_size_reset = ImGui::CalcTextSize(reset_label);
     const ImVec2 text_size_auto = ImGui::CalcTextSize(auto_label);
@@ -785,6 +803,8 @@ void OpenGLFeature::RenderInImGuiChild(int model_index) {
     if (ImGui::Button(auto_label, ImVec2(auto_button_width, button_height))) {
         g_auto_rotate_model = !g_auto_rotate_model;
     }
+    ImGui::SameLine(0.0f, 14.0f);
+    ImGui::Checkbox("LMB Drag Moves Light", &g_move_light_with_lmb);
 
     ImGui::Spacing();
 
