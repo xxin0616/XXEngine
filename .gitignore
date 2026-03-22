@@ -1,0 +1,56 @@
+# Visual Studio
+.vs/
+*.VC.db
+*.VC.opendb
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Build output
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+_out/
+XXEngine/x64/
+XXEngine/x86/
+
+# MSBuild intermediate files
+*.obj
+*.idb
+*.ilk
+*.pdb
+*.ipch
+*.tlog
+*.lastbuildstate
+*.recipe
+*.log
+*.cache
+
+# Binaries and libraries
+*.exe
+*.dll
+*.lib
+*.exp
+*.a
+*.so
+*.dylib
+
+# CMake / Ninja (if introduced later)
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+compile_commands.json
+build/
+.ninja_deps
+.ninja_log
+
+# Runtime/editor generated files
+imgui.ini
+result/
+
+# OS junk
+.DS_Store
+Thumbs.db
+desktop.ini
