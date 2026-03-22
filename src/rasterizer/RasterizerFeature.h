@@ -15,8 +15,14 @@ namespace RasterizerFeature
 	int GetModelOptionCount();
 	const char* GetModelOptionName(int index);
 	std::string GetModelOptionLoaderName(int index);
+	int GetModelOptionId(int index);
 	std::string GetModelOptionPath(int index);
 	std::string GetModelOptionPrimaryTexturePath(int index);
+	int GetModelOptionTexturePathCount(int index);
+	std::string GetModelOptionTexturePath(int index, int texture_index);
+	int GetModelOptionSupportedShaderCount(int index);
+	int GetModelOptionSupportedShaderId(int index, int shader_index);
+	std::string GetShaderNameById(int shader_id);
 	void GetModelOptionOpenGLRotationDeg(int index, float& rx, float& ry, float& rz);
 	void SetModelOption(int index);
 	int GetModelOption();

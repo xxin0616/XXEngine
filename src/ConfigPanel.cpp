@@ -52,6 +52,22 @@ bool ConfigPanel::ConsumeCaptureRequest(std::string& outputPath) {
     return true;
 }
 
+int ConfigPanel::GetOpenGLShaderId() const {
+    const int model_index = m_openglModelIndex;
+    const int shader_count = RasterizerFeature::GetModelOptionSupportedShaderCount(model_index);
+    if (shader_count <= 0)
+        return 1;
+
+    int selected_index = 0;
+    const auto it = m_openglShaderSelectionIndexByModel.find(model_index);
+    if (it != m_openglShaderSelectionIndexByModel.end())
+        selected_index = it->second;
+    selected_index = std::clamp(selected_index, 0, shader_count - 1);
+
+    const int shader_id = RasterizerFeature::GetModelOptionSupportedShaderId(model_index, selected_index);
+    return (shader_id > 0) ? shader_id : 1;
+}
+
 void ConfigPanel::OnRender() {
     m_featureIndex = std::clamp(m_featureIndex, 0, 1);
     m_rasterizerShaderIndex = std::clamp(m_rasterizerShaderIndex, 0, 4);
@@ -132,6 +148,38 @@ void ConfigPanel::OnRender() {
             int dummy_model = 0;
             const char* none[] = { "No models" };
             ImGui::Combo("##OpenGLModelNone", &dummy_model, none, 1);
+            ImGui::EndDisabled();
+        }
+
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextUnformatted("Shader:");
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+        const int shader_count = RasterizerFeature::GetModelOptionSupportedShaderCount(m_openglModelIndex);
+        if (shader_count > 0) {
+            int& selected_index = m_openglShaderSelectionIndexByModel[m_openglModelIndex];
+            selected_index = std::clamp(selected_index, 0, shader_count - 1);
+
+            std::vector<std::string> shader_names;
+            std::vector<const char*> shader_name_items;
+            shader_names.reserve(shader_count);
+            shader_name_items.reserve(shader_count);
+            for (int i = 0; i < shader_count; ++i) {
+                const int shader_id = RasterizerFeature::GetModelOptionSupportedShaderId(m_openglModelIndex, i);
+                std::string shader_name = RasterizerFeature::GetShaderNameById(shader_id);
+                if (shader_name.empty())
+                    shader_name = "Shader";
+                shader_names.push_back(shader_name);
+            }
+            for (auto& name : shader_names)
+                shader_name_items.push_back(name.c_str());
+            ImGui::Combo("##OpenGLShader", &selected_index, shader_name_items.data(), shader_count);
+        }
+        else {
+            ImGui::BeginDisabled();
+            int dummy_shader = 0;
+            const char* none[] = { "No shaders" };
+            ImGui::Combo("##OpenGLShaderNone", &dummy_shader, none, 1);
             ImGui::EndDisabled();
         }
     }

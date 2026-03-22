@@ -16,7 +16,8 @@ XXEngine 是一个基于 C++ 的图形学项目，当前集成了两条渲染后
 - OpenGL 功能
   - 最小三角形回退渲染（MVP 验证）
   - 模型加载与显示（当前支持 OBJ 与 glTF）
-  - 纹理显示与 Blinn-Phong shader 路径
+  - 纹理显示与 Blinn-Phong / PBR shader 路径
+  - 基于 `models.json` 的模型可用 Shader 列表切换
   - 鼠标/键盘交互（相机平移、模型平移/旋转）
   - 工具栏支持一键重置与自动旋转开关
 
@@ -83,7 +84,7 @@ XXEngine/
 │  ├─ bezier/                # 贝塞尔曲线相关
 │  ├─ loaders/               # 模型加载抽象层（OBJ / glTF，可扩展）
 │  ├─ models/                # 模型资源与 models.json
-│  ├─ opengl/                # OpenGL 后端与 shader
+│  ├─ OpenGL/                # OpenGL 后端与 shader
 │  ├─ rasterizer/            # 软光栅化核心代码
 │  ├─ ConfigPanel.*          # 左侧配置面板
 │  └─ main.cpp               # 程序入口与主循环
@@ -120,9 +121,10 @@ XXEngine/
     - `Raster`：软光栅化路径
     - `OpenGL`：OpenGL 路径
   - `Models`：模型选择（在 Raster/OpenGL 下均可用）
+  - `Shader`（OpenGL）：位于 `Models` 下方，仅显示当前模型支持的 shader（来自 `models.json`）
 - 右侧渲染区域
   - Raster：显示软光栅化结果
-  - OpenGL：显示实时渲染结果与工具栏
+  - OpenGL：显示实时渲染结果与工具栏（重置/自动旋转）
 
 OpenGL 交互（当前逻辑）：
 
@@ -139,24 +141,55 @@ OpenGL 交互（当前逻辑）：
 
 模型列表由 `src/models/models.json` 驱动，关键字段：
 
+- `shader`：Shader 字典，定义 `id -> 名称` 映射（供 UI 展示）
 - `id`：模型 ID
 - `name`：显示名称
 - `loaders`：加载器类型（如 `obj` / `gltf`）
 - `modelpath`：模型路径（相对 `models.json`）
 - `opengl_rotation_deg`：OpenGL 下模型初始旋转矫正（XYZ）
-- `texturespath`：纹理路径数组（当前主流程使用第一个作为主纹理）
+- `shaders`：该模型支持的 shader id 数组（对应上方 `shader` 字典）
+- `texturespath`：纹理路径数组
+  - 对 PBR（DamagedHelmet）默认约定顺序：`albedo / metalRoughness / normal / AO / emissive`
+
+说明：
+
+- OpenGL 下 `opengl_rotation_deg` 会在模型加载后应用；修改后需重启程序生效。
+- glTF 模型不再硬编码翻转 Y 轴，姿态矫正以 `opengl_rotation_deg` 为准。
 
 示例：
 
 ```json
 {
-  "id": 2,
-  "name": "DamagedHelmet",
-  "loaders": "gltf",
-  "modelpath": "./DamagedHelmet/glTF/DamagedHelmet.gltf",
-  "opengl_rotation_deg": [0.0, 0.0, 0.0],
-  "texturespath": [
-    "./DamagedHelmet/glTF/Default_albedo.jpg"
+  "shader": {
+    "sum": 2,
+    "1": "BlinnPhong",
+    "2": "PBR"
+  },
+  "models": [
+    {
+      "id": 1,
+      "name": "spot",
+      "loaders": "obj",
+      "modelpath": "./spot/spot_triangulated_good.obj",
+      "opengl_rotation_deg": [180.0, 0.0, 0.0],
+      "shaders": ["1"],
+      "texturespath": ["./spot/spot_texture.png"]
+    },
+    {
+      "id": 2,
+      "name": "DamagedHelmet",
+      "loaders": "gltf",
+      "modelpath": "./DamagedHelmet/glTF/DamagedHelmet.gltf",
+      "opengl_rotation_deg": [0.0, 0.0, 180.0],
+      "shaders": ["2", "1"],
+      "texturespath": [
+        "./DamagedHelmet/glTF/Default_albedo.jpg",
+        "./DamagedHelmet/glTF/Default_metalRoughness.jpg",
+        "./DamagedHelmet/glTF/Default_normal.jpg",
+        "./DamagedHelmet/glTF/Default_AO.jpg",
+        "./DamagedHelmet/glTF/Default_emissive.jpg"
+      ]
+    }
   ]
 }
 ```
@@ -164,7 +197,7 @@ OpenGL 交互（当前逻辑）：
 ## 可扩展方向
 
 - 在 `src/loaders` 新增更多格式加载器（如 FBX、更多 glTF 变体）
-- 在 `src/opengl/shaders` 下扩展更多着色效果（如 PBR）
+- 在 `src/OpenGL/shaders` 下扩展更多着色效果
 - 将 OpenGL 与 Raster 的材质/灯光参数统一为同一套配置结构
 
 ## 已知说明

@@ -8,6 +8,17 @@
 #include <filesystem>
 #include <string>
 
+namespace {
+OpenGLShadingEffect ToOpenGLEffectFromShaderId(int shader_id)
+{
+	if (shader_id == 2)
+		return OpenGLShadingEffect::Pbr;
+	if (shader_id == 1)
+		return OpenGLShadingEffect::BlinnPhong;
+	return OpenGLShadingEffect::Textured;
+}
+}
+
 #ifdef _WIN32
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3native.h>
@@ -117,7 +128,10 @@ int main()
 		}
 		else if (ConfigPanel::GetConfig() == 1)
 		{
-			OpenGLFeature::RenderInImGuiChild(configPanel.GetOpenGLModelIndex());
+			const int model_index = configPanel.GetOpenGLModelIndex();
+			const int selected_shader_id = configPanel.GetOpenGLShaderId();
+			OpenGLFeature::SetShadingEffect(ToOpenGLEffectFromShaderId(selected_shader_id));
+			OpenGLFeature::RenderInImGuiChild(model_index);
 		}
 		else
 		{

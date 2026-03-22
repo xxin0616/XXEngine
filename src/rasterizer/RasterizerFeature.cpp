@@ -25,6 +25,7 @@
 #include <memory>
 #include <mutex>
 #include <thread>
+#include <unordered_map>
 #include <vector>
 
 using namespace Eigen;
@@ -69,6 +70,7 @@ namespace RasterizerFeature
 			std::string loader;
 			std::filesystem::path model_path;
 			std::vector<std::filesystem::path> texture_paths;
+			std::vector<int> supported_shader_ids;
 			std::array<float, 3> opengl_rotation_deg{ 0.0f, 0.0f, 0.0f };
 		};
 
@@ -81,6 +83,7 @@ namespace RasterizerFeature
 		std::vector<Triangle*> g_triangles;
 		std::vector<Texture> g_textures;
 		std::vector<ModelConfig> g_model_configs;
+		std::unordered_map<int, std::string> g_shader_name_by_id;
 
 		GLuint g_texture_id = 0;
 		int g_tex_w = 0;
@@ -390,6 +393,7 @@ namespace RasterizerFeature
 		void LoadModelConfigsFromJson()
 		{
 			g_model_configs.clear();
+			g_shader_name_by_id.clear();
 
 			const std::filesystem::path json_path = FindModelsJsonPath();
 			if (json_path.empty())
@@ -400,6 +404,9 @@ namespace RasterizerFeature
 				fallback.loader = "obj";
 				fallback.model_path = std::filesystem::path("src/models/spot/spot_triangulated_good.obj");
 				fallback.texture_paths.push_back(std::filesystem::path("src/models/spot/spot_texture.png"));
+				fallback.supported_shader_ids.push_back(1);
+				g_shader_name_by_id[1] = "BlinnPhong";
+				g_shader_name_by_id[2] = "PBR";
 				g_model_configs.push_back(fallback);
 				return;
 			}
@@ -414,11 +421,29 @@ namespace RasterizerFeature
 				fallback.loader = "obj";
 				fallback.model_path = std::filesystem::path("src/models/spot/spot_triangulated_good.obj");
 				fallback.texture_paths.push_back(std::filesystem::path("src/models/spot/spot_texture.png"));
+				fallback.supported_shader_ids.push_back(1);
+				g_shader_name_by_id[1] = "BlinnPhong";
+				g_shader_name_by_id[2] = "PBR";
 				g_model_configs.push_back(fallback);
 				return;
 			}
 
 			const std::filesystem::path base_dir = json_path.parent_path();
+			cv::FileNode shader_root = fs["shader"];
+			if (!shader_root.empty()) {
+				const int shader_sum = (int)shader_root["sum"];
+				for (int sid = 1; sid <= shader_sum; ++sid) {
+					const std::string key = std::to_string(sid);
+					const std::string shader_name = (std::string)shader_root[key];
+					if (!shader_name.empty())
+						g_shader_name_by_id[sid] = shader_name;
+				}
+			}
+			if (g_shader_name_by_id.find(1) == g_shader_name_by_id.end())
+				g_shader_name_by_id[1] = "BlinnPhong";
+			if (g_shader_name_by_id.find(2) == g_shader_name_by_id.end())
+				g_shader_name_by_id[2] = "PBR";
+
 			cv::FileNode models = fs["models"];
 			for (auto it = models.begin(); it != models.end(); ++it)
 			{
@@ -435,6 +460,24 @@ namespace RasterizerFeature
 				{
 					const std::string tex_rel = (std::string)(*t);
 					cfg.texture_paths.push_back((base_dir / TrimLeadingCurrentDir(tex_rel)).lexically_normal());
+				}
+
+				cv::FileNode shaders_node = (*it)["shaders"];
+				for (auto s = shaders_node.begin(); s != shaders_node.end(); ++s)
+				{
+					const std::string shader_id_str = (std::string)(*s);
+					try {
+						const int shader_id = std::stoi(shader_id_str);
+						if (shader_id > 0)
+							cfg.supported_shader_ids.push_back(shader_id);
+					}
+					catch (...) {}
+				}
+				if (cfg.supported_shader_ids.empty())
+				{
+					cfg.supported_shader_ids.push_back(1);
+					if (cfg.id == 2)
+						cfg.supported_shader_ids.push_back(2);
 				}
 
 				cv::FileNode rot_node = (*it)["opengl_rotation_deg"];
@@ -454,6 +497,7 @@ namespace RasterizerFeature
 			fallback.loader = "obj";
 			fallback.model_path = std::filesystem::path("src/models/spot/spot_triangulated_good.obj");
 			fallback.texture_paths.push_back(std::filesystem::path("src/models/spot/spot_texture.png"));
+			fallback.supported_shader_ids.push_back(1);
 			g_model_configs.push_back(fallback);
 #endif
 
@@ -465,7 +509,12 @@ namespace RasterizerFeature
 				fallback.loader = "obj";
 				fallback.model_path = std::filesystem::path("src/models/spot/spot_triangulated_good.obj");
 				fallback.texture_paths.push_back(std::filesystem::path("src/models/spot/spot_texture.png"));
+				fallback.supported_shader_ids.push_back(1);
 				g_model_configs.push_back(fallback);
+			}
+			if (g_shader_name_by_id.empty()) {
+				g_shader_name_by_id[1] = "BlinnPhong";
+				g_shader_name_by_id[2] = "PBR";
 			}
 		}
 
@@ -795,6 +844,15 @@ namespace RasterizerFeature
 		return g_model_configs[index].loader;
 	}
 
+	int GetModelOptionId(int index)
+	{
+		if (g_model_configs.empty())
+			LoadModelConfigsFromJson();
+		if (index < 0 || index >= (int)g_model_configs.size())
+			return -1;
+		return g_model_configs[index].id;
+	}
+
 	std::string GetModelOptionPath(int index)
 	{
 		if (g_model_configs.empty())
@@ -814,6 +872,58 @@ namespace RasterizerFeature
 		if (textures.empty())
 			return {};
 		return textures[0].string();
+	}
+
+	int GetModelOptionTexturePathCount(int index)
+	{
+		if (g_model_configs.empty())
+			LoadModelConfigsFromJson();
+		if (index < 0 || index >= (int)g_model_configs.size())
+			return 0;
+		return (int)g_model_configs[index].texture_paths.size();
+	}
+
+	std::string GetModelOptionTexturePath(int index, int texture_index)
+	{
+		if (g_model_configs.empty())
+			LoadModelConfigsFromJson();
+		if (index < 0 || index >= (int)g_model_configs.size())
+			return {};
+		const auto& textures = g_model_configs[index].texture_paths;
+		if (texture_index < 0 || texture_index >= (int)textures.size())
+			return {};
+		return textures[(size_t)texture_index].string();
+	}
+
+	int GetModelOptionSupportedShaderCount(int index)
+	{
+		if (g_model_configs.empty())
+			LoadModelConfigsFromJson();
+		if (index < 0 || index >= (int)g_model_configs.size())
+			return 0;
+		return (int)g_model_configs[index].supported_shader_ids.size();
+	}
+
+	int GetModelOptionSupportedShaderId(int index, int shader_index)
+	{
+		if (g_model_configs.empty())
+			LoadModelConfigsFromJson();
+		if (index < 0 || index >= (int)g_model_configs.size())
+			return -1;
+		const auto& shader_ids = g_model_configs[index].supported_shader_ids;
+		if (shader_index < 0 || shader_index >= (int)shader_ids.size())
+			return -1;
+		return shader_ids[(size_t)shader_index];
+	}
+
+	std::string GetShaderNameById(int shader_id)
+	{
+		if (g_model_configs.empty())
+			LoadModelConfigsFromJson();
+		const auto it = g_shader_name_by_id.find(shader_id);
+		if (it != g_shader_name_by_id.end())
+			return it->second;
+		return "Shader";
 	}
 
 	void GetModelOptionOpenGLRotationDeg(int index, float& rx, float& ry, float& rz)

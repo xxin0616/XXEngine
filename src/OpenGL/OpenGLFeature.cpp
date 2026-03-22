@@ -30,9 +30,12 @@ struct Vertex {
 struct MeshData {
     bool ready = false;
     int model_index = -1;
+    int model_id = -1;
     std::vector<Vertex> vertices;
     GLuint texture_id = 0;
     bool has_texture = false;
+    std::array<GLuint, 5> pbr_texture_ids{ 0, 0, 0, 0, 0 };
+    std::array<bool, 5> has_pbr_texture{ false, false, false, false, false };
 };
 
 struct ShaderEffectPaths {
@@ -76,6 +79,18 @@ using PFNGLACTIVETEXTUREPROC = void (*)(GLenum texture);
 #endif
 #ifndef GL_TEXTURE0
 #define GL_TEXTURE0 0x84C0
+#endif
+#ifndef GL_TEXTURE1
+#define GL_TEXTURE1 0x84C1
+#endif
+#ifndef GL_TEXTURE2
+#define GL_TEXTURE2 0x84C2
+#endif
+#ifndef GL_TEXTURE3
+#define GL_TEXTURE3 0x84C3
+#endif
+#ifndef GL_TEXTURE4
+#define GL_TEXTURE4 0x84C4
 #endif
 
 struct GlFns {
@@ -203,16 +218,23 @@ void HandleInput(bool hovered) {
     }
 }
 
-void ReleaseLoadedTexture() {
+void ReleaseLoadedTextures() {
     if (g_loaded_mesh.texture_id != 0) {
         glDeleteTextures(1, &g_loaded_mesh.texture_id);
         g_loaded_mesh.texture_id = 0;
     }
     g_loaded_mesh.has_texture = false;
+    for (size_t i = 0; i < g_loaded_mesh.pbr_texture_ids.size(); ++i) {
+        if (g_loaded_mesh.pbr_texture_ids[i] != 0) {
+            glDeleteTextures(1, &g_loaded_mesh.pbr_texture_ids[i]);
+            g_loaded_mesh.pbr_texture_ids[i] = 0;
+        }
+        g_loaded_mesh.has_pbr_texture[i] = false;
+    }
 }
 
-bool LoadTextureForModel(const std::string& texture_path) {
-    ReleaseLoadedTexture();
+bool LoadTextureFromPath(const std::string& texture_path, GLuint& out_texture_id) {
+    out_texture_id = 0;
     if (texture_path.empty())
         return false;
 
@@ -231,8 +253,8 @@ bool LoadTextureForModel(const std::string& texture_path) {
         return false;
     }
 
-    glGenTextures(1, &g_loaded_mesh.texture_id);
-    glBindTexture(GL_TEXTURE_2D, g_loaded_mesh.texture_id);
+    glGenTextures(1, &out_texture_id);
+    glBindTexture(GL_TEXTURE_2D, out_texture_id);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -241,6 +263,17 @@ bool LoadTextureForModel(const std::string& texture_path) {
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
     stbi_image_free(data);
 
+    return true;
+}
+
+bool LoadTextureForModel(const std::string& texture_path) {
+    GLuint texture_id = 0;
+    if (!LoadTextureFromPath(texture_path, texture_id))
+        return false;
+
+    if (g_loaded_mesh.texture_id != 0)
+        glDeleteTextures(1, &g_loaded_mesh.texture_id);
+    g_loaded_mesh.texture_id = texture_id;
     g_loaded_mesh.has_texture = true;
     return true;
 }
@@ -286,8 +319,9 @@ void EnsureSelectedModelLoaded() {
 
     g_loaded_mesh.ready = true;
     g_loaded_mesh.model_index = g_render_model_index;
+    g_loaded_mesh.model_id = RasterizerFeature::GetModelOptionId(g_render_model_index);
     g_loaded_mesh.vertices.clear();
-    ReleaseLoadedTexture();
+    ReleaseLoadedTextures();
 
     const std::string model_path_str = RasterizerFeature::GetModelOptionPath(g_render_model_index);
     if (model_path_str.empty())
@@ -308,14 +342,15 @@ void EnsureSelectedModelLoaded() {
     if (!loaders::LoadModel(model_path, format, model, error))
         return;
 
+    const bool flip_y_axis = (format == loaders::ModelFormat::Obj);
     for (const auto& mesh : model.meshes) {
         for (const auto& in_v : mesh.vertices) {
             Vertex out_v;
             out_v.x = in_v.px;
-            out_v.y = -in_v.py;
+            out_v.y = flip_y_axis ? -in_v.py : in_v.py;
             out_v.z = in_v.pz;
             out_v.nx = in_v.nx;
-            out_v.ny = -in_v.ny;
+            out_v.ny = flip_y_axis ? -in_v.ny : in_v.ny;
             out_v.nz = in_v.nz;
             out_v.u = in_v.u;
             out_v.v = in_v.v;
@@ -327,6 +362,17 @@ void EnsureSelectedModelLoaded() {
 
     const std::string texture_path = RasterizerFeature::GetModelOptionPrimaryTexturePath(g_render_model_index);
     LoadTextureForModel(texture_path);
+
+    const int texture_count = RasterizerFeature::GetModelOptionTexturePathCount(g_render_model_index);
+    const int pbr_slots = std::min(texture_count, (int)g_loaded_mesh.pbr_texture_ids.size());
+    for (int i = 0; i < pbr_slots; ++i) {
+        const std::string pbr_texture_path = RasterizerFeature::GetModelOptionTexturePath(g_render_model_index, i);
+        GLuint texture_id = 0;
+        if (LoadTextureFromPath(pbr_texture_path, texture_id)) {
+            g_loaded_mesh.pbr_texture_ids[(size_t)i] = texture_id;
+            g_loaded_mesh.has_pbr_texture[(size_t)i] = true;
+        }
+    }
 }
 
 bool LoadGlFunctions() {
@@ -379,13 +425,13 @@ ShaderEffectPaths ResolveShaderEffectPaths(OpenGLShadingEffect effect) {
     switch (effect) {
     case OpenGLShadingEffect::BlinnPhong:
         return ShaderEffectPaths{
-            std::filesystem::path("src/opengl/shaders/blinnPhong/blinnphong.vert"),
-            std::filesystem::path("src/opengl/shaders/blinnPhong/blinnphong.frag")
+            std::filesystem::path("src/OpenGL/shaders/blinnPhong/blinnphong.vert"),
+            std::filesystem::path("src/OpenGL/shaders/blinnPhong/blinnphong.frag")
         };
     case OpenGLShadingEffect::Pbr:
         return ShaderEffectPaths{
-            std::filesystem::path("src/opengl/shaders/pbr/pbr.vert"),
-            std::filesystem::path("src/opengl/shaders/pbr/pbr.frag")
+            std::filesystem::path("src/OpenGL/shaders/pbr/pbr.vert"),
+            std::filesystem::path("src/OpenGL/shaders/pbr/pbr.frag")
         };
     case OpenGLShadingEffect::Textured:
     default:
@@ -461,22 +507,75 @@ GLuint EnsureShaderProgram(OpenGLShadingEffect effect) {
 }
 
 GLuint BeginShadingProgram(bool use_texture) {
+    const bool is_damaged_helmet = (g_loaded_mesh.model_id == 2);
+    if (is_damaged_helmet && g_shading_effect == OpenGLShadingEffect::Pbr) {
+        const GLuint pbr_program = EnsureShaderProgram(OpenGLShadingEffect::Pbr);
+        if (pbr_program != 0) {
+            g_gl.UseProgram(pbr_program);
+
+            const GLint loc_base = g_gl.GetUniformLocation(pbr_program, "uBaseColorTex");
+            const GLint loc_mr = g_gl.GetUniformLocation(pbr_program, "uMetalRoughTex");
+            const GLint loc_normal = g_gl.GetUniformLocation(pbr_program, "uNormalTex");
+            const GLint loc_ao = g_gl.GetUniformLocation(pbr_program, "uAOTex");
+            const GLint loc_emissive = g_gl.GetUniformLocation(pbr_program, "uEmissiveTex");
+            const GLint loc_has_base = g_gl.GetUniformLocation(pbr_program, "uHasBaseColorTex");
+            const GLint loc_has_mr = g_gl.GetUniformLocation(pbr_program, "uHasMetalRoughTex");
+            const GLint loc_has_normal = g_gl.GetUniformLocation(pbr_program, "uHasNormalTex");
+            const GLint loc_has_ao = g_gl.GetUniformLocation(pbr_program, "uHasAOTex");
+            const GLint loc_has_emissive = g_gl.GetUniformLocation(pbr_program, "uHasEmissiveTex");
+            const GLint loc_light_pos = g_gl.GetUniformLocation(pbr_program, "uLightPosView");
+            const GLint loc_light_color = g_gl.GetUniformLocation(pbr_program, "uLightColor");
+            const GLint loc_ambient = g_gl.GetUniformLocation(pbr_program, "uAmbientIntensity");
+
+            if (loc_base >= 0)
+                g_gl.Uniform1i(loc_base, 0);
+            if (loc_mr >= 0)
+                g_gl.Uniform1i(loc_mr, 1);
+            if (loc_normal >= 0)
+                g_gl.Uniform1i(loc_normal, 2);
+            if (loc_ao >= 0)
+                g_gl.Uniform1i(loc_ao, 3);
+            if (loc_emissive >= 0)
+                g_gl.Uniform1i(loc_emissive, 4);
+
+            if (loc_has_base >= 0)
+                g_gl.Uniform1i(loc_has_base, g_loaded_mesh.has_pbr_texture[0] ? 1 : 0);
+            if (loc_has_mr >= 0)
+                g_gl.Uniform1i(loc_has_mr, g_loaded_mesh.has_pbr_texture[1] ? 1 : 0);
+            if (loc_has_normal >= 0)
+                g_gl.Uniform1i(loc_has_normal, g_loaded_mesh.has_pbr_texture[2] ? 1 : 0);
+            if (loc_has_ao >= 0)
+                g_gl.Uniform1i(loc_has_ao, g_loaded_mesh.has_pbr_texture[3] ? 1 : 0);
+            if (loc_has_emissive >= 0)
+                g_gl.Uniform1i(loc_has_emissive, g_loaded_mesh.has_pbr_texture[4] ? 1 : 0);
+
+            if (loc_light_pos >= 0)
+                g_gl.Uniform3f(loc_light_pos, 1.8f, 2.2f, 2.5f);
+            if (loc_light_color >= 0)
+                g_gl.Uniform3f(loc_light_color, 12.0f, 12.0f, 12.0f);
+            if (loc_ambient >= 0)
+                g_gl.Uniform3f(loc_ambient, 0.04f, 0.04f, 0.04f);
+
+            return pbr_program;
+        }
+    }
+
     if (g_shading_effect != OpenGLShadingEffect::BlinnPhong)
         return 0;
 
-    const GLuint program = EnsureShaderProgram(OpenGLShadingEffect::BlinnPhong);
-    if (program == 0)
+    const GLuint blinn_program = EnsureShaderProgram(OpenGLShadingEffect::BlinnPhong);
+    if (blinn_program == 0)
         return 0;
 
-    g_gl.UseProgram(program);
+    g_gl.UseProgram(blinn_program);
 
-    const GLint loc_use_tex = g_gl.GetUniformLocation(program, "uUseTexture");
-    const GLint loc_tex = g_gl.GetUniformLocation(program, "uDiffuseTex");
-    const GLint loc_ambient = g_gl.GetUniformLocation(program, "uAmbientColor");
-    const GLint loc_diffuse = g_gl.GetUniformLocation(program, "uDiffuseColor");
-    const GLint loc_spec = g_gl.GetUniformLocation(program, "uSpecularColor");
-    const GLint loc_shine = g_gl.GetUniformLocation(program, "uShininess");
-    const GLint loc_light = g_gl.GetUniformLocation(program, "uLightPosView");
+    const GLint loc_use_tex = g_gl.GetUniformLocation(blinn_program, "uUseTexture");
+    const GLint loc_tex = g_gl.GetUniformLocation(blinn_program, "uDiffuseTex");
+    const GLint loc_ambient = g_gl.GetUniformLocation(blinn_program, "uAmbientColor");
+    const GLint loc_diffuse = g_gl.GetUniformLocation(blinn_program, "uDiffuseColor");
+    const GLint loc_spec = g_gl.GetUniformLocation(blinn_program, "uSpecularColor");
+    const GLint loc_shine = g_gl.GetUniformLocation(blinn_program, "uShininess");
+    const GLint loc_light = g_gl.GetUniformLocation(blinn_program, "uLightPosView");
 
     if (loc_use_tex >= 0)
         g_gl.Uniform1i(loc_use_tex, use_texture ? 1 : 0);
@@ -493,7 +592,7 @@ GLuint BeginShadingProgram(bool use_texture) {
     if (loc_light >= 0)
         g_gl.Uniform3f(loc_light, 1.8f, 2.2f, 2.5f);
 
-    return program;
+    return blinn_program;
 }
 
 void EndShadingProgram(GLuint program) {
@@ -523,13 +622,29 @@ void DrawLoadedMesh(float aspect) {
     glClear(GL_DEPTH_BUFFER_BIT);
 
     const bool use_texture = g_loaded_mesh.has_texture;
-    if (use_texture) {
+    const bool can_bind_multi = LoadGlFunctions();
+    const bool is_damaged_helmet = (g_loaded_mesh.model_id == 2);
+    const bool use_pbr_path =
+        (g_shading_effect == OpenGLShadingEffect::Pbr) && is_damaged_helmet && can_bind_multi;
+
+    if (use_texture || use_pbr_path) {
         glEnable(GL_TEXTURE_2D);
-        if (LoadGlFunctions())
+        if (can_bind_multi) {
             g_gl.ActiveTexture(GL_TEXTURE0);
+        }
         glBindTexture(GL_TEXTURE_2D, g_loaded_mesh.texture_id);
-    }
-    else {
+
+        if (use_pbr_path && can_bind_multi) {
+            for (int i = 0; i < (int)g_loaded_mesh.pbr_texture_ids.size(); ++i) {
+                g_gl.ActiveTexture(GL_TEXTURE0 + i);
+                const GLuint tex_id = g_loaded_mesh.has_pbr_texture[(size_t)i]
+                    ? g_loaded_mesh.pbr_texture_ids[(size_t)i]
+                    : 0;
+                glBindTexture(GL_TEXTURE_2D, tex_id);
+            }
+            g_gl.ActiveTexture(GL_TEXTURE0);
+        }
+    } else {
         glDisable(GL_TEXTURE_2D);
     }
 
@@ -581,6 +696,14 @@ void DrawLoadedMesh(float aspect) {
     glEnd();
 
     EndShadingProgram(program);
+
+    if (use_pbr_path && can_bind_multi) {
+        for (int i = 0; i < (int)g_loaded_mesh.pbr_texture_ids.size(); ++i) {
+            g_gl.ActiveTexture(GL_TEXTURE0 + i);
+            glBindTexture(GL_TEXTURE_2D, 0);
+        }
+        g_gl.ActiveTexture(GL_TEXTURE0);
+    }
 
     glPopMatrix();
     glMatrixMode(GL_PROJECTION);

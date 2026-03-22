@@ -1,5 +1,6 @@
 ﻿#include "Include.h"
 #include <string>
+#include <unordered_map>
 
 class ConfigPanel {
 public:
@@ -11,6 +12,7 @@ public:
     int GetRasterizerShaderIndex() const { return m_rasterizerShaderIndex; }
     int GetRasterizerModelIndex() const { return m_rasterizerModelIndex; }
     int GetOpenGLModelIndex() const { return m_openglModelIndex; }
+    int GetOpenGLShaderId() const;
     bool ConsumeCaptureRequest(std::string& outputPath);
 
 private:
@@ -22,6 +24,7 @@ private:
     int m_rasterizerShaderIndex = 0; // 0:texture 1:normal 2:phong 3:bump 4:displacement
     int m_rasterizerModelIndex = 0;
     int m_openglModelIndex = 0;
+    std::unordered_map<int, int> m_openglShaderSelectionIndexByModel;
     bool m_captureRequested = false;
     std::string m_captureOutputPath;
 };

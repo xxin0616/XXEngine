@@ -1,12 +1,18 @@
 {
   "models_sum": 2,
+  "shader": {
+    "sum": 2,
+    "1": "BlinnPhong",
+    "2": "PBR"
+  },
   "models": [
     {
       "id": 1,
       "name": "spot",
       "loaders": "obj",
       "modelpath": "./spot/spot_triangulated_good.obj",
-      "opengl_rotation_deg": [180.0, 0.0, 0.0],
+      "opengl_rotation_deg": [ 180.0, 0.0, 0.0 ],
+      "shaders": ["1"],
       "texturespath": [
         "./spot/spot_texture.png"
       ]
@@ -16,9 +22,14 @@
       "name": "DamagedHelmet",
       "loaders": "gltf",
       "modelpath": "./DamagedHelmet/glTF/DamagedHelmet.gltf",
-      "opengl_rotation_deg": [0.0, 0.0, 0.0],
+      "opengl_rotation_deg": [ 0.0, 180.0, 180.0 ],
+      "shaders": ["2","1"],
       "texturespath": [
-        "./DamagedHelmet/glTF/Default_albedo.jpg"
+        "./DamagedHelmet/glTF/Default_albedo.jpg",
+        "./DamagedHelmet/glTF/Default_metalRoughness.jpg",
+        "./DamagedHelmet/glTF/Default_normal.jpg",
+        "./DamagedHelmet/glTF/Default_AO.jpg",
+        "./DamagedHelmet/glTF/Default_emissive.jpg"
       ]
     }
   ]
