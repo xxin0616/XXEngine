@@ -136,6 +136,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="lib\glad\src\glad.c" />
     <ClCompile Include="lib\ImGui\imgui.cpp" />
     <ClCompile Include="lib\ImGui\imgui_demo.cpp" />
     <ClCompile Include="lib\ImGui\imgui_draw.cpp" />
@@ -161,6 +162,8 @@
     <ClCompile Include="src\StbImageWriteImpl.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="lib\glad\include\glad\glad.h" />
+    <ClInclude Include="lib\glad\include\KHR\khrplatform.h" />
     <ClInclude Include="lib\ImGui\imconfig.h" />
     <ClInclude Include="lib\ImGui\imgui.h" />
     <ClInclude Include="lib\ImGui\imgui_impl_glfw.h" />

@@ -84,6 +84,9 @@
     <ClCompile Include="src\rasterizer\util.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="C:\Users\Momo\Downloads\glad (1)\src\glad.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="lib\ImGui\imconfig.h">
@@ -168,6 +171,12 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="src\rasterizer\util.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\Momo\Downloads\glad (1)\include\glad\glad.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\Momo\Downloads\glad (1)\include\KHR\khrplatform.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

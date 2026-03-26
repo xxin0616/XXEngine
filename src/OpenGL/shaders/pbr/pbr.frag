@@ -1,4 +1,6 @@
-#version 120
+#version 330 core
+
+out vec4 FragColor;
 
 uniform sampler2D uBaseColorTex;
 uniform sampler2D uMetalRoughTex;
@@ -16,9 +18,9 @@ uniform vec3 uLightPosView;
 uniform vec3 uLightColor;
 uniform vec3 uAmbientIntensity;
 
-varying vec3 vNormal;
-varying vec3 vPosView;
-varying vec2 vUV;
+in vec3 vNormal;
+in vec3 vPosView;
+in vec2 vUV;
 
 const float PI = 3.14159265;
 
@@ -52,31 +54,31 @@ void main()
     vec3 N = normalize(vNormal);
     if (uHasNormalTex == 1) {
         // GL2 fixed pipeline path has no tangent basis here; use a mild perturbation.
-        vec3 mappedN = normalize(texture2D(uNormalTex, vUV).xyz * 2.0 - 1.0);
+        vec3 mappedN = normalize(texture(uNormalTex, vUV).xyz * 2.0 - 1.0);
         N = normalize(mix(N, mappedN, 0.35));
     }
 
     vec3 baseColor = vec3(0.86, 0.86, 0.88);
     if (uHasBaseColorTex == 1) {
-        baseColor = texture2D(uBaseColorTex, vUV).rgb;
+        baseColor = texture(uBaseColorTex, vUV).rgb;
     }
 
     float metallic = 0.0;
     float roughness = 0.65;
     if (uHasMetalRoughTex == 1) {
-        vec3 mr = texture2D(uMetalRoughTex, vUV).rgb;
+        vec3 mr = texture(uMetalRoughTex, vUV).rgb;
         metallic = clamp(mr.b, 0.0, 1.0);
         roughness = clamp(mr.g, 0.04, 1.0);
     }
 
     float ao = 1.0;
     if (uHasAOTex == 1) {
-        ao = texture2D(uAOTex, vUV).r;
+        ao = texture(uAOTex, vUV).r;
     }
 
     vec3 emissive = vec3(0.0);
     if (uHasEmissiveTex == 1) {
-        emissive = texture2D(uEmissiveTex, vUV).rgb;
+        emissive = texture(uEmissiveTex, vUV).rgb;
     }
 
     vec3 V = normalize(-vPosView);
@@ -108,5 +110,5 @@ void main()
     color = color / (color + vec3(1.0));
     color = pow(color, vec3(1.0 / 2.2));
 
-    gl_FragColor = vec4(color, 1.0);
+    FragColor = vec4(color, 1.0);
 }

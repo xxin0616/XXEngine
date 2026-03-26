@@ -71,7 +71,6 @@ namespace RasterizerFeature
 			std::filesystem::path model_path;
 			std::vector<std::filesystem::path> texture_paths;
 			std::vector<int> supported_shader_ids;
-			std::array<float, 3> opengl_rotation_deg{ 0.0f, 0.0f, 0.0f };
 		};
 
 		int g_shader_option = ShaderOption::TextureShader;
@@ -100,6 +99,7 @@ namespace RasterizerFeature
 		bool g_has_completed = false;
 		RenderParams g_completed_params;
 		std::vector<unsigned char> g_completed_rgb;
+		double g_last_render_time_ms = 0.0;
 
 		std::vector<unsigned char> g_display_rgb;
 		int g_display_w = 0;
@@ -480,13 +480,6 @@ namespace RasterizerFeature
 						cfg.supported_shader_ids.push_back(2);
 				}
 
-				cv::FileNode rot_node = (*it)["opengl_rotation_deg"];
-				if (rot_node.isSeq() && rot_node.size() >= 3) {
-					cfg.opengl_rotation_deg[0] = (float)rot_node[0];
-					cfg.opengl_rotation_deg[1] = (float)rot_node[1];
-					cfg.opengl_rotation_deg[2] = (float)rot_node[2];
-				}
-
 				if (!cfg.name.empty())
 					g_model_configs.push_back(cfg);
 			}
@@ -606,7 +599,7 @@ namespace RasterizerFeature
 			SelectModelAndTexture(local_params);
 			if (g_triangles.empty())
 				BuildFallbackTriangles();
-			g_eye_pos_render = params.eye_pos;
+			g_eye_pos_render = params.eye_pos; 
 
 			rst::rasterizer rasterizer(params.w, params.h);
 			rasterizer.clear(rst::Buffers::Color | rst::Buffers::Depth | rst::Buffers::SampleColor | rst::Buffers::SampleDepth);
@@ -656,7 +649,11 @@ namespace RasterizerFeature
 				}
 
 				NotificationCenter::SetPersistent("rasterizer_status", "\xE8\xBD\xAF\xE5\x85\x89\xE6\xA0\x85\xE5\x8C\x96\xE5\x99\xA8\xEF\xBC\x9A\xE6\xB8\xB2\xE6\x9F\x93\xE4\xB8\xAD...");
+				auto start_time = std::chrono::high_resolution_clock::now();
 				std::vector<unsigned char> rgb = RenderFrameCPU(params);
+				auto end_time = std::chrono::high_resolution_clock::now();
+				double render_time_ms = std::chrono::duration<double, std::milli>(end_time - start_time).count();
+
 				std::cout << "render ok!" << std::endl;
 				NotificationCenter::ClearPersistent("rasterizer_status");
 				NotificationCenter::Push("\xE8\xBD\xAF\xE5\x85\x89\xE6\xA0\x85\xE5\x8C\x96\xE5\x99\xA8\xEF\xBC\x9A\xE6\xB8\xB2\xE6\x9F\x93\xE5\xAE\x8C\xE6\x88\x90", 3.0f);
@@ -667,6 +664,7 @@ namespace RasterizerFeature
 					g_completed_rgb = std::move(rgb);
 					g_has_completed = true;
 					g_is_rendering = false;
+					g_last_render_time_ms = render_time_ms;
 				}
 			}
 		}
@@ -926,22 +924,6 @@ namespace RasterizerFeature
 		return "Shader";
 	}
 
-	void GetModelOptionOpenGLRotationDeg(int index, float& rx, float& ry, float& rz)
-	{
-		rx = 0.0f;
-		ry = 0.0f;
-		rz = 0.0f;
-
-		if (g_model_configs.empty())
-			LoadModelConfigsFromJson();
-		if (index < 0 || index >= (int)g_model_configs.size())
-			return;
-
-		rx = g_model_configs[index].opengl_rotation_deg[0];
-		ry = g_model_configs[index].opengl_rotation_deg[1];
-		rz = g_model_configs[index].opengl_rotation_deg[2];
-	}
-
 	void SetModelOption(int index)
 	{
 		if (g_model_configs.empty())
@@ -1001,6 +983,28 @@ namespace RasterizerFeature
 		// Submit render request after applying current frame input,
 		// so status notifications react immediately to mouse/keyboard interaction.
 		EnqueueRenderIfNeeded(w, h, g_shader_option);
+
+		// Overlay for frame time
+		double last_time = 0.0;
+		{
+			std::lock_guard<std::mutex> lock(g_mutex);
+			last_time = g_last_render_time_ms;
+		}
+		if (last_time > 0.0) {
+			ImGuiWindowFlags overlay_flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove;
+			ImVec2 window_pos = ImVec2(avail.x - 20.0f, 20.0f);
+			ImVec2 window_pos_pivot = ImVec2(1.0f, 0.0f);
+			
+			// Adjust pos to be relative to the child window if needed, 
+			// GetCursorScreenPos gives us the top-left of the child window client area before drawing the image
+			ImVec2 child_pos = ImGui::GetWindowPos();
+			ImGui::SetNextWindowPos(ImVec2(child_pos.x + avail.x - 20.0f, child_pos.y + 20.0f), ImGuiCond_Always, window_pos_pivot);
+			ImGui::SetNextWindowBgAlpha(0.35f); // Transparent background
+			if (ImGui::Begin("Rasterizer Performance Overlay", nullptr, overlay_flags)) {
+				ImGui::Text("CPU Render Time: %.2f ms", last_time);
+			}
+			ImGui::End();
+		}
 	}
 
 	bool SaveCurrentPng(const std::string& output_path)

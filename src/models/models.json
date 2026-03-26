@@ -11,7 +11,6 @@
       "name": "spot",
       "loaders": "obj",
       "modelpath": "./spot/spot_triangulated_good.obj",
-      "opengl_rotation_deg": [ 180.0, 0.0, 0.0 ],
       "shaders": ["1"],
       "texturespath": [
         "./spot/spot_texture.png"
@@ -22,7 +21,6 @@
       "name": "DamagedHelmet",
       "loaders": "gltf",
       "modelpath": "./DamagedHelmet/glTF/DamagedHelmet.gltf",
-      "opengl_rotation_deg": [ 0.0, 90.0, 180.0 ],
       "shaders": ["2","1"],
       "texturespath": [
         "./DamagedHelmet/glTF/Default_albedo.jpg",

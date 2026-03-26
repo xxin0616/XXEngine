@@ -36,83 +36,101 @@ struct MeshData {
     bool has_texture = false;
     std::array<GLuint, 5> pbr_texture_ids{ 0, 0, 0, 0, 0 };
     std::array<bool, 5> has_pbr_texture{ false, false, false, false, false };
+    GLuint vbo = 0;
+    GLuint vao = 0;
+};
+
+struct Mat4 {
+    float m[16] = {
+        1, 0, 0, 0,
+        0, 1, 0, 0,
+        0, 0, 1, 0,
+        0, 0, 0, 1
+    };
+
+    Mat4() {}
+
+    static Mat4 Identity() { return Mat4(); }
+
+    static Mat4 Frustum(float left, float right, float bottom, float top, float zNear, float zFar) {
+        Mat4 res;
+        for (int i=0; i<16; ++i) res.m[i] = 0;
+        res.m[0] = (2.0f * zNear) / (right - left);
+        res.m[5] = (2.0f * zNear) / (top - bottom);
+        res.m[8] = (right + left) / (right - left);
+        res.m[9] = (top + bottom) / (top - bottom);
+        res.m[10] = -(zFar + zNear) / (zFar - zNear);
+        res.m[11] = -1.0f;
+        res.m[14] = -(2.0f * zFar * zNear) / (zFar - zNear);
+        return res;
+    }
+
+    static Mat4 Translation(float x, float y, float z) {
+        Mat4 res;
+        res.m[12] = x; res.m[13] = y; res.m[14] = z;
+        return res;
+    }
+
+    static Mat4 RotationX(float angle_deg) {
+        Mat4 res;
+        float c = std::cos(angle_deg * 3.14159265f / 180.0f);
+        float s = std::sin(angle_deg * 3.14159265f / 180.0f);
+        res.m[5] = c; res.m[6] = s;
+        res.m[9] = -s; res.m[10] = c;
+        return res;
+    }
+
+    static Mat4 RotationY(float angle_deg) {
+        Mat4 res;
+        float c = std::cos(angle_deg * 3.14159265f / 180.0f);
+        float s = std::sin(angle_deg * 3.14159265f / 180.0f);
+        res.m[0] = c; res.m[2] = -s;
+        res.m[8] = s; res.m[10] = c;
+        return res;
+    }
+
+    static Mat4 RotationZ(float angle_deg) {
+        Mat4 res;
+        float c = std::cos(angle_deg * 3.14159265f / 180.0f);
+        float s = std::sin(angle_deg * 3.14159265f / 180.0f);
+        res.m[0] = c; res.m[1] = s;
+        res.m[4] = -s; res.m[5] = c;
+        return res;
+    }
+
+    Mat4 operator*(const Mat4& o) const {
+        Mat4 res;
+        for (int c = 0; c < 4; ++c) {
+            for (int r = 0; r < 4; ++r) {
+                res.m[c * 4 + r] =
+                    m[0 * 4 + r] * o.m[c * 4 + 0] +
+                    m[1 * 4 + r] * o.m[c * 4 + 1] +
+                    m[2 * 4 + r] * o.m[c * 4 + 2] +
+                    m[3 * 4 + r] * o.m[c * 4 + 3];
+            }
+        }
+        return res;
+    }
+};
+
+struct Mat3 {
+    float m[9] = {
+        1, 0, 0,
+        0, 1, 0,
+        0, 0, 1
+    };
+    static Mat3 FromMat4(const Mat4& mat) {
+        Mat3 res;
+        res.m[0] = mat.m[0]; res.m[1] = mat.m[1]; res.m[2] = mat.m[2];
+        res.m[3] = mat.m[4]; res.m[4] = mat.m[5]; res.m[5] = mat.m[6];
+        res.m[6] = mat.m[8]; res.m[7] = mat.m[9]; res.m[8] = mat.m[10];
+        return res;
+    }
 };
 
 struct ShaderEffectPaths {
     std::filesystem::path vertex_path;
     std::filesystem::path fragment_path;
-};
-
-using PFNGLCREATESHADERPROC = GLuint (*)(GLenum type);
-using PFNGLSHADERSOURCEPROC = void (*)(GLuint shader, GLsizei count, const char* const* string, const GLint* length);
-using PFNGLCOMPILESHADERPROC = void (*)(GLuint shader);
-using PFNGLGETSHADERIVPROC = void (*)(GLuint shader, GLenum pname, GLint* params);
-using PFNGLGETSHADERINFOLOGPROC = void (*)(GLuint shader, GLsizei maxLength, GLsizei* length, char* infoLog);
-using PFNGLDELETESHADERPROC = void (*)(GLuint shader);
-using PFNGLCREATEPROGRAMPROC = GLuint (*)();
-using PFNGLATTACHSHADERPROC = void (*)(GLuint program, GLuint shader);
-using PFNGLLINKPROGRAMPROC = void (*)(GLuint program);
-using PFNGLGETPROGRAMIVPROC = void (*)(GLuint program, GLenum pname, GLint* params);
-using PFNGLGETPROGRAMINFOLOGPROC = void (*)(GLuint program, GLsizei maxLength, GLsizei* length, char* infoLog);
-using PFNGLUSEPROGRAMPROC = void (*)(GLuint program);
-using PFNGLDELETEPROGRAMPROC = void (*)(GLuint program);
-using PFNGLGETUNIFORMLOCATIONPROC = GLint (*)(GLuint program, const char* name);
-using PFNGLUNIFORM1IPROC = void (*)(GLint location, GLint v0);
-using PFNGLUNIFORM1FPROC = void (*)(GLint location, GLfloat v0);
-using PFNGLUNIFORM3FPROC = void (*)(GLint location, GLfloat v0, GLfloat v1, GLfloat v2);
-using PFNGLACTIVETEXTUREPROC = void (*)(GLenum texture);
-
-#ifndef GL_VERTEX_SHADER
-#define GL_VERTEX_SHADER 0x8B31
-#endif
-#ifndef GL_FRAGMENT_SHADER
-#define GL_FRAGMENT_SHADER 0x8B30
-#endif
-#ifndef GL_COMPILE_STATUS
-#define GL_COMPILE_STATUS 0x8B81
-#endif
-#ifndef GL_LINK_STATUS
-#define GL_LINK_STATUS 0x8B82
-#endif
-#ifndef GL_INFO_LOG_LENGTH
-#define GL_INFO_LOG_LENGTH 0x8B84
-#endif
-#ifndef GL_TEXTURE0
-#define GL_TEXTURE0 0x84C0
-#endif
-#ifndef GL_TEXTURE1
-#define GL_TEXTURE1 0x84C1
-#endif
-#ifndef GL_TEXTURE2
-#define GL_TEXTURE2 0x84C2
-#endif
-#ifndef GL_TEXTURE3
-#define GL_TEXTURE3 0x84C3
-#endif
-#ifndef GL_TEXTURE4
-#define GL_TEXTURE4 0x84C4
-#endif
-
-struct GlFns {
-    bool loaded = false;
-    PFNGLCREATESHADERPROC CreateShader = nullptr;
-    PFNGLSHADERSOURCEPROC ShaderSource = nullptr;
-    PFNGLCOMPILESHADERPROC CompileShader = nullptr;
-    PFNGLGETSHADERIVPROC GetShaderiv = nullptr;
-    PFNGLGETSHADERINFOLOGPROC GetShaderInfoLog = nullptr;
-    PFNGLDELETESHADERPROC DeleteShader = nullptr;
-    PFNGLCREATEPROGRAMPROC CreateProgram = nullptr;
-    PFNGLATTACHSHADERPROC AttachShader = nullptr;
-    PFNGLLINKPROGRAMPROC LinkProgram = nullptr;
-    PFNGLGETPROGRAMIVPROC GetProgramiv = nullptr;
-    PFNGLGETPROGRAMINFOLOGPROC GetProgramInfoLog = nullptr;
-    PFNGLUSEPROGRAMPROC UseProgram = nullptr;
-    PFNGLDELETEPROGRAMPROC DeleteProgram = nullptr;
-    PFNGLGETUNIFORMLOCATIONPROC GetUniformLocation = nullptr;
-    PFNGLUNIFORM1IPROC Uniform1i = nullptr;
-    PFNGLUNIFORM1FPROC Uniform1f = nullptr;
-    PFNGLUNIFORM3FPROC Uniform3f = nullptr;
-    PFNGLACTIVETEXTUREPROC ActiveTexture = nullptr;
 };
 
 MeshData g_loaded_mesh;
@@ -133,7 +151,6 @@ float g_light_pos_x = 1.8f;
 float g_light_pos_y = 2.2f;
 float g_light_pos_z = 2.5f;
 
-GlFns g_gl;
 std::unordered_map<int, GLuint> g_shader_program_by_effect;
 
 void ResetCameraAndModelPose() {
@@ -249,6 +266,14 @@ void ReleaseLoadedTextures() {
         }
         g_loaded_mesh.has_pbr_texture[i] = false;
     }
+    if (g_loaded_mesh.vbo != 0) {
+        glDeleteBuffers(1, &g_loaded_mesh.vbo);
+        g_loaded_mesh.vbo = 0;
+    }
+    if (g_loaded_mesh.vao != 0) {
+        glDeleteVertexArrays(1, &g_loaded_mesh.vao);
+        g_loaded_mesh.vao = 0;
+    }
 }
 
 bool LoadTextureFromPath(const std::string& texture_path, GLuint& out_texture_id) {
@@ -360,15 +385,14 @@ void EnsureSelectedModelLoaded() {
     if (!loaders::LoadModel(model_path, format, model, error))
         return;
 
-    const bool flip_y_axis = (format == loaders::ModelFormat::Obj);
     for (const auto& mesh : model.meshes) {
         for (const auto& in_v : mesh.vertices) {
             Vertex out_v;
             out_v.x = in_v.px;
-            out_v.y = flip_y_axis ? -in_v.py : in_v.py;
+            out_v.y = in_v.py;
             out_v.z = in_v.pz;
             out_v.nx = in_v.nx;
-            out_v.ny = flip_y_axis ? -in_v.ny : in_v.ny;
+            out_v.ny = in_v.ny;
             out_v.nz = in_v.nz;
             out_v.u = in_v.u;
             out_v.v = in_v.v;
@@ -377,6 +401,36 @@ void EnsureSelectedModelLoaded() {
     }
 
     NormalizeMesh(g_loaded_mesh.vertices);
+
+    if (g_loaded_mesh.vao != 0) {
+        glDeleteVertexArrays(1, &g_loaded_mesh.vao);
+        g_loaded_mesh.vao = 0;
+    }
+    if (g_loaded_mesh.vbo != 0) {
+        glDeleteBuffers(1, &g_loaded_mesh.vbo);
+        g_loaded_mesh.vbo = 0;
+    }
+
+    glGenVertexArrays(1, &g_loaded_mesh.vao);
+    glGenBuffers(1, &g_loaded_mesh.vbo);
+
+    glBindVertexArray(g_loaded_mesh.vao);
+    glBindBuffer(GL_ARRAY_BUFFER, g_loaded_mesh.vbo);
+    glBufferData(GL_ARRAY_BUFFER, g_loaded_mesh.vertices.size() * sizeof(Vertex), g_loaded_mesh.vertices.data(), GL_STATIC_DRAW);
+
+    // Position (x, y, z)
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, x));
+
+    // Normal (nx, ny, nz)
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, nx));
+
+    // UV (u, v)
+    glEnableVertexAttribArray(2);
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, u));
+
+    glBindVertexArray(0);
 
     const std::string texture_path = RasterizerFeature::GetModelOptionPrimaryTexturePath(g_render_model_index);
     LoadTextureForModel(texture_path);
@@ -391,43 +445,6 @@ void EnsureSelectedModelLoaded() {
             g_loaded_mesh.has_pbr_texture[(size_t)i] = true;
         }
     }
-}
-
-bool LoadGlFunctions() {
-    if (g_gl.loaded)
-        return true;
-
-    auto load = [](const char* name) -> void* {
-        return reinterpret_cast<void*>(glfwGetProcAddress(name));
-    };
-
-    g_gl.CreateShader = reinterpret_cast<PFNGLCREATESHADERPROC>(load("glCreateShader"));
-    g_gl.ShaderSource = reinterpret_cast<PFNGLSHADERSOURCEPROC>(load("glShaderSource"));
-    g_gl.CompileShader = reinterpret_cast<PFNGLCOMPILESHADERPROC>(load("glCompileShader"));
-    g_gl.GetShaderiv = reinterpret_cast<PFNGLGETSHADERIVPROC>(load("glGetShaderiv"));
-    g_gl.GetShaderInfoLog = reinterpret_cast<PFNGLGETSHADERINFOLOGPROC>(load("glGetShaderInfoLog"));
-    g_gl.DeleteShader = reinterpret_cast<PFNGLDELETESHADERPROC>(load("glDeleteShader"));
-    g_gl.CreateProgram = reinterpret_cast<PFNGLCREATEPROGRAMPROC>(load("glCreateProgram"));
-    g_gl.AttachShader = reinterpret_cast<PFNGLATTACHSHADERPROC>(load("glAttachShader"));
-    g_gl.LinkProgram = reinterpret_cast<PFNGLLINKPROGRAMPROC>(load("glLinkProgram"));
-    g_gl.GetProgramiv = reinterpret_cast<PFNGLGETPROGRAMIVPROC>(load("glGetProgramiv"));
-    g_gl.GetProgramInfoLog = reinterpret_cast<PFNGLGETPROGRAMINFOLOGPROC>(load("glGetProgramInfoLog"));
-    g_gl.UseProgram = reinterpret_cast<PFNGLUSEPROGRAMPROC>(load("glUseProgram"));
-    g_gl.DeleteProgram = reinterpret_cast<PFNGLDELETEPROGRAMPROC>(load("glDeleteProgram"));
-    g_gl.GetUniformLocation = reinterpret_cast<PFNGLGETUNIFORMLOCATIONPROC>(load("glGetUniformLocation"));
-    g_gl.Uniform1i = reinterpret_cast<PFNGLUNIFORM1IPROC>(load("glUniform1i"));
-    g_gl.Uniform1f = reinterpret_cast<PFNGLUNIFORM1FPROC>(load("glUniform1f"));
-    g_gl.Uniform3f = reinterpret_cast<PFNGLUNIFORM3FPROC>(load("glUniform3f"));
-    g_gl.ActiveTexture = reinterpret_cast<PFNGLACTIVETEXTUREPROC>(load("glActiveTexture"));
-
-    const bool ok = g_gl.CreateShader && g_gl.ShaderSource && g_gl.CompileShader &&
-        g_gl.GetShaderiv && g_gl.GetShaderInfoLog && g_gl.DeleteShader && g_gl.CreateProgram &&
-        g_gl.AttachShader && g_gl.LinkProgram && g_gl.GetProgramiv && g_gl.GetProgramInfoLog &&
-        g_gl.UseProgram && g_gl.DeleteProgram && g_gl.GetUniformLocation && g_gl.Uniform1i &&
-        g_gl.Uniform1f && g_gl.Uniform3f && g_gl.ActiveTexture;
-
-    g_gl.loaded = ok;
-    return ok;
 }
 
 std::string ReadTextFile(const std::filesystem::path& path) {
@@ -458,24 +475,28 @@ ShaderEffectPaths ResolveShaderEffectPaths(OpenGLShadingEffect effect) {
 }
 
 GLuint CompileShader(GLenum type, const std::string& source) {
-    GLuint shader = g_gl.CreateShader(type);
+    GLuint shader = glCreateShader(type);
     const char* src = source.c_str();
-    g_gl.ShaderSource(shader, 1, &src, nullptr);
-    g_gl.CompileShader(shader);
+    glShaderSource(shader, 1, &src, nullptr);
+    glCompileShader(shader);
 
     GLint compiled = 0;
-    g_gl.GetShaderiv(shader, GL_COMPILE_STATUS, &compiled);
+    glGetShaderiv(shader, GL_COMPILE_STATUS, &compiled);
     if (compiled != GL_TRUE) {
-        g_gl.DeleteShader(shader);
+        GLint info_len = 0;
+        glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &info_len);
+        if (info_len > 1) {
+            std::vector<char> info_log(info_len);
+            glGetShaderInfoLog(shader, info_len, nullptr, info_log.data());
+            printf("Shader Compile Error (%d):\n%s\n", type, info_log.data());
+        }
+        glDeleteShader(shader);
         return 0;
     }
     return shader;
 }
 
 GLuint BuildShaderProgram(const ShaderEffectPaths& paths) {
-    if (!LoadGlFunctions())
-        return 0;
-
     const std::string vs = ReadTextFile(paths.vertex_path);
     const std::string fs = ReadTextFile(paths.fragment_path);
     if (vs.empty() || fs.empty())
@@ -485,23 +506,30 @@ GLuint BuildShaderProgram(const ShaderEffectPaths& paths) {
     const GLuint frag = CompileShader(GL_FRAGMENT_SHADER, fs);
     if (vert == 0 || frag == 0) {
         if (vert != 0)
-            g_gl.DeleteShader(vert);
+            glDeleteShader(vert);
         if (frag != 0)
-            g_gl.DeleteShader(frag);
+            glDeleteShader(frag);
         return 0;
     }
 
-    GLuint program = g_gl.CreateProgram();
-    g_gl.AttachShader(program, vert);
-    g_gl.AttachShader(program, frag);
-    g_gl.LinkProgram(program);
-    g_gl.DeleteShader(vert);
-    g_gl.DeleteShader(frag);
+    GLuint program = glCreateProgram();
+    glAttachShader(program, vert);
+    glAttachShader(program, frag);
+    glLinkProgram(program);
+    glDeleteShader(vert);
+    glDeleteShader(frag);
 
     GLint linked = 0;
-    g_gl.GetProgramiv(program, GL_LINK_STATUS, &linked);
+    glGetProgramiv(program, GL_LINK_STATUS, &linked);
     if (linked != GL_TRUE) {
-        g_gl.DeleteProgram(program);
+        GLint info_len = 0;
+        glGetProgramiv(program, GL_INFO_LOG_LENGTH, &info_len);
+        if (info_len > 1) {
+            std::vector<char> info_log(info_len);
+            glGetProgramInfoLog(program, info_len, nullptr, info_log.data());
+            printf("Program Link Error:\n%s\n", info_log.data());
+        }
+        glDeleteProgram(program);
         return 0;
     }
 
@@ -529,50 +557,50 @@ GLuint BeginShadingProgram(bool use_texture) {
     if (is_damaged_helmet && g_shading_effect == OpenGLShadingEffect::Pbr) {
         const GLuint pbr_program = EnsureShaderProgram(OpenGLShadingEffect::Pbr);
         if (pbr_program != 0) {
-            g_gl.UseProgram(pbr_program);
+            glUseProgram(pbr_program);
 
-            const GLint loc_base = g_gl.GetUniformLocation(pbr_program, "uBaseColorTex");
-            const GLint loc_mr = g_gl.GetUniformLocation(pbr_program, "uMetalRoughTex");
-            const GLint loc_normal = g_gl.GetUniformLocation(pbr_program, "uNormalTex");
-            const GLint loc_ao = g_gl.GetUniformLocation(pbr_program, "uAOTex");
-            const GLint loc_emissive = g_gl.GetUniformLocation(pbr_program, "uEmissiveTex");
-            const GLint loc_has_base = g_gl.GetUniformLocation(pbr_program, "uHasBaseColorTex");
-            const GLint loc_has_mr = g_gl.GetUniformLocation(pbr_program, "uHasMetalRoughTex");
-            const GLint loc_has_normal = g_gl.GetUniformLocation(pbr_program, "uHasNormalTex");
-            const GLint loc_has_ao = g_gl.GetUniformLocation(pbr_program, "uHasAOTex");
-            const GLint loc_has_emissive = g_gl.GetUniformLocation(pbr_program, "uHasEmissiveTex");
-            const GLint loc_light_pos = g_gl.GetUniformLocation(pbr_program, "uLightPosView");
-            const GLint loc_light_color = g_gl.GetUniformLocation(pbr_program, "uLightColor");
-            const GLint loc_ambient = g_gl.GetUniformLocation(pbr_program, "uAmbientIntensity");
+            const GLint loc_base = glGetUniformLocation(pbr_program, "uBaseColorTex");
+            const GLint loc_mr = glGetUniformLocation(pbr_program, "uMetalRoughTex");
+            const GLint loc_normal = glGetUniformLocation(pbr_program, "uNormalTex");
+            const GLint loc_ao = glGetUniformLocation(pbr_program, "uAOTex");
+            const GLint loc_emissive = glGetUniformLocation(pbr_program, "uEmissiveTex");
+            const GLint loc_has_base = glGetUniformLocation(pbr_program, "uHasBaseColorTex");
+            const GLint loc_has_mr = glGetUniformLocation(pbr_program, "uHasMetalRoughTex");
+            const GLint loc_has_normal = glGetUniformLocation(pbr_program, "uHasNormalTex");
+            const GLint loc_has_ao = glGetUniformLocation(pbr_program, "uHasAOTex");
+            const GLint loc_has_emissive = glGetUniformLocation(pbr_program, "uHasEmissiveTex");
+            const GLint loc_light_pos = glGetUniformLocation(pbr_program, "uLightPosView");
+            const GLint loc_light_color = glGetUniformLocation(pbr_program, "uLightColor");
+            const GLint loc_ambient = glGetUniformLocation(pbr_program, "uAmbientIntensity");
 
             if (loc_base >= 0)
-                g_gl.Uniform1i(loc_base, 0);
+                glUniform1i(loc_base, 0);
             if (loc_mr >= 0)
-                g_gl.Uniform1i(loc_mr, 1);
+                glUniform1i(loc_mr, 1);
             if (loc_normal >= 0)
-                g_gl.Uniform1i(loc_normal, 2);
+                glUniform1i(loc_normal, 2);
             if (loc_ao >= 0)
-                g_gl.Uniform1i(loc_ao, 3);
+                glUniform1i(loc_ao, 3);
             if (loc_emissive >= 0)
-                g_gl.Uniform1i(loc_emissive, 4);
+                glUniform1i(loc_emissive, 4);
 
             if (loc_has_base >= 0)
-                g_gl.Uniform1i(loc_has_base, g_loaded_mesh.has_pbr_texture[0] ? 1 : 0);
+                glUniform1i(loc_has_base, g_loaded_mesh.has_pbr_texture[0] ? 1 : 0);
             if (loc_has_mr >= 0)
-                g_gl.Uniform1i(loc_has_mr, g_loaded_mesh.has_pbr_texture[1] ? 1 : 0);
+                glUniform1i(loc_has_mr, g_loaded_mesh.has_pbr_texture[1] ? 1 : 0);
             if (loc_has_normal >= 0)
-                g_gl.Uniform1i(loc_has_normal, g_loaded_mesh.has_pbr_texture[2] ? 1 : 0);
+                glUniform1i(loc_has_normal, g_loaded_mesh.has_pbr_texture[2] ? 1 : 0);
             if (loc_has_ao >= 0)
-                g_gl.Uniform1i(loc_has_ao, g_loaded_mesh.has_pbr_texture[3] ? 1 : 0);
+                glUniform1i(loc_has_ao, g_loaded_mesh.has_pbr_texture[3] ? 1 : 0);
             if (loc_has_emissive >= 0)
-                g_gl.Uniform1i(loc_has_emissive, g_loaded_mesh.has_pbr_texture[4] ? 1 : 0);
+                glUniform1i(loc_has_emissive, g_loaded_mesh.has_pbr_texture[4] ? 1 : 0);
 
             if (loc_light_pos >= 0)
-                g_gl.Uniform3f(loc_light_pos, g_light_pos_x, g_light_pos_y, g_light_pos_z);
+                glUniform3f(loc_light_pos, g_light_pos_x, g_light_pos_y, g_light_pos_z);
             if (loc_light_color >= 0)
-                g_gl.Uniform3f(loc_light_color, 12.0f, 12.0f, 12.0f);
+                glUniform3f(loc_light_color, 12.0f, 12.0f, 12.0f);
             if (loc_ambient >= 0)
-                g_gl.Uniform3f(loc_ambient, 0.04f, 0.04f, 0.04f);
+                glUniform3f(loc_ambient, 0.04f, 0.04f, 0.04f);
 
             return pbr_program;
         }
@@ -585,49 +613,86 @@ GLuint BeginShadingProgram(bool use_texture) {
     if (blinn_program == 0)
         return 0;
 
-    g_gl.UseProgram(blinn_program);
+    glUseProgram(blinn_program);
 
-    const GLint loc_use_tex = g_gl.GetUniformLocation(blinn_program, "uUseTexture");
-    const GLint loc_tex = g_gl.GetUniformLocation(blinn_program, "uDiffuseTex");
-    const GLint loc_ambient = g_gl.GetUniformLocation(blinn_program, "uAmbientColor");
-    const GLint loc_diffuse = g_gl.GetUniformLocation(blinn_program, "uDiffuseColor");
-    const GLint loc_spec = g_gl.GetUniformLocation(blinn_program, "uSpecularColor");
-    const GLint loc_shine = g_gl.GetUniformLocation(blinn_program, "uShininess");
-    const GLint loc_light = g_gl.GetUniformLocation(blinn_program, "uLightPosView");
+    const GLint loc_use_tex = glGetUniformLocation(blinn_program, "uUseTexture");
+    const GLint loc_tex = glGetUniformLocation(blinn_program, "uDiffuseTex");
+    const GLint loc_ambient = glGetUniformLocation(blinn_program, "uAmbientColor");
+    const GLint loc_diffuse = glGetUniformLocation(blinn_program, "uDiffuseColor");
+    const GLint loc_spec = glGetUniformLocation(blinn_program, "uSpecularColor");
+    const GLint loc_shine = glGetUniformLocation(blinn_program, "uShininess");
+    const GLint loc_light = glGetUniformLocation(blinn_program, "uLightPosView");
 
     if (loc_use_tex >= 0)
-        g_gl.Uniform1i(loc_use_tex, use_texture ? 1 : 0);
+        glUniform1i(loc_use_tex, use_texture ? 1 : 0);
     if (loc_tex >= 0)
-        g_gl.Uniform1i(loc_tex, 0);
+        glUniform1i(loc_tex, 0);
     if (loc_ambient >= 0)
-        g_gl.Uniform3f(loc_ambient, 0.06f, 0.06f, 0.06f);
+        glUniform3f(loc_ambient, 0.06f, 0.06f, 0.06f);
     if (loc_diffuse >= 0)
-        g_gl.Uniform3f(loc_diffuse, 0.84f, 0.84f, 0.87f);
+        glUniform3f(loc_diffuse, 0.84f, 0.84f, 0.87f);
     if (loc_spec >= 0)
-        g_gl.Uniform3f(loc_spec, 0.70f, 0.70f, 0.70f);
+        glUniform3f(loc_spec, 0.70f, 0.70f, 0.70f);
     if (loc_shine >= 0)
-        g_gl.Uniform1f(loc_shine, 64.0f);
+        glUniform1f(loc_shine, 64.0f);
     if (loc_light >= 0)
-        g_gl.Uniform3f(loc_light, g_light_pos_x, g_light_pos_y, g_light_pos_z);
+        glUniform3f(loc_light, g_light_pos_x, g_light_pos_y, g_light_pos_z);
 
     return blinn_program;
 }
 
 void EndShadingProgram(GLuint program) {
     if (program != 0)
-        g_gl.UseProgram(0);
+        glUseProgram(0);
+}
+
+static GLuint g_fallback_program = 0;
+static GLuint g_fallback_vao = 0;
+static GLuint g_fallback_vbo = 0;
+
+void InitFallback() {
+    if (g_fallback_program != 0) return;
+    const char* vs = "#version 330 core\nlayout(location=0) in vec2 aPos;\nlayout(location=1) in vec3 aColor;\nout vec3 vColor;\nvoid main(){\ngl_Position = vec4(aPos.x * 2.0 - 1.0, 1.0 - aPos.y * 2.0, 0.0, 1.0);\nvColor = aColor;\n}";
+    const char* fs = "#version 330 core\nin vec3 vColor;\nout vec4 FragColor;\nvoid main(){\nFragColor = vec4(vColor, 1.0);\n}";
+    
+    GLuint v = glCreateShader(GL_VERTEX_SHADER);
+    glShaderSource(v, 1, &vs, nullptr);
+    glCompileShader(v);
+    
+    GLuint f = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(f, 1, &fs, nullptr);
+    glCompileShader(f);
+    
+    g_fallback_program = glCreateProgram();
+    glAttachShader(g_fallback_program, v);
+    glAttachShader(g_fallback_program, f);
+    glLinkProgram(g_fallback_program);
+    
+    float verts[] = {
+        0.50f, 0.14f,  0.95f, 0.20f, 0.18f,
+        0.18f, 0.82f,  0.16f, 0.76f, 0.34f,
+        0.82f, 0.82f,  0.12f, 0.47f, 0.95f
+    };
+    
+    glGenVertexArrays(1, &g_fallback_vao);
+    glGenBuffers(1, &g_fallback_vbo);
+    glBindVertexArray(g_fallback_vao);
+    glBindBuffer(GL_ARRAY_BUFFER, g_fallback_vbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(verts), verts, GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(2 * sizeof(float)));
+    glBindVertexArray(0);
 }
 
 void DrawTriangleFallback() {
-    glDisable(GL_TEXTURE_2D);
-    glBegin(GL_TRIANGLES);
-    glColor3f(0.95f, 0.20f, 0.18f);
-    glVertex2f(0.50f, 0.14f);
-    glColor3f(0.16f, 0.76f, 0.34f);
-    glVertex2f(0.18f, 0.82f);
-    glColor3f(0.12f, 0.47f, 0.95f);
-    glVertex2f(0.82f, 0.82f);
-    glEnd();
+    InitFallback();
+    glUseProgram(g_fallback_program);
+    glBindVertexArray(g_fallback_vao);
+    glDrawArrays(GL_TRIANGLES, 0, 3);
+    glBindVertexArray(0);
+    glUseProgram(0);
 }
 
 void DrawLoadedMesh(float aspect) {
@@ -637,42 +702,34 @@ void DrawLoadedMesh(float aspect) {
 
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LEQUAL);
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
     glClear(GL_DEPTH_BUFFER_BIT);
 
     const bool use_texture = g_loaded_mesh.has_texture;
-    const bool can_bind_multi = LoadGlFunctions();
+    const bool can_bind_multi = true;
     const bool is_damaged_helmet = (g_loaded_mesh.model_id == 2);
     const bool use_pbr_path =
         (g_shading_effect == OpenGLShadingEffect::Pbr) && is_damaged_helmet && can_bind_multi;
 
     if (use_texture || use_pbr_path) {
-        glEnable(GL_TEXTURE_2D);
         if (can_bind_multi) {
-            g_gl.ActiveTexture(GL_TEXTURE0);
+            glActiveTexture(GL_TEXTURE0);
         }
         glBindTexture(GL_TEXTURE_2D, g_loaded_mesh.texture_id);
 
         if (use_pbr_path && can_bind_multi) {
             for (int i = 0; i < (int)g_loaded_mesh.pbr_texture_ids.size(); ++i) {
-                g_gl.ActiveTexture(GL_TEXTURE0 + i);
+                glActiveTexture(GL_TEXTURE0 + i);
                 const GLuint tex_id = g_loaded_mesh.has_pbr_texture[(size_t)i]
                     ? g_loaded_mesh.pbr_texture_ids[(size_t)i]
                     : 0;
                 glBindTexture(GL_TEXTURE_2D, tex_id);
             }
-            g_gl.ActiveTexture(GL_TEXTURE0);
+            glActiveTexture(GL_TEXTURE0);
         }
-    } else {
-        glDisable(GL_TEXTURE_2D);
     }
 
-    glDisable(GL_LIGHTING);
-    glDisable(GL_LIGHT0);
-    glDisable(GL_COLOR_MATERIAL);
-
-    glMatrixMode(GL_PROJECTION);
-    glPushMatrix();
-    glLoadIdentity();
     const float fov_deg = 45.0f;
     if (aspect < 1e-5f)
         aspect = 1.0f;
@@ -680,55 +737,50 @@ void DrawLoadedMesh(float aspect) {
     const float z_far = 100.0f;
     const float ymax = z_near * std::tan(fov_deg * 3.14159265f / 360.0f);
     const float xmax = ymax * aspect;
-    glFrustum(-xmax, xmax, -ymax, ymax, z_near, z_far);
 
-    glMatrixMode(GL_MODELVIEW);
-    glPushMatrix();
-    glLoadIdentity();
-    glTranslatef(g_camera_offset_x, g_camera_offset_y, -3.2f);
-    glRotatef(-15.0f, 1.0f, 0.0f, 0.0f);
-    glTranslatef(g_model_offset_x, g_model_offset_y, 0.0f);
-    glRotatef(g_model_rotate_x_deg, 1.0f, 0.0f, 0.0f);
-    glRotatef(g_model_rotate_y_deg, 0.0f, 1.0f, 0.0f);
+    Mat4 proj = Mat4::Frustum(-xmax, xmax, -ymax, ymax, z_near, z_far);
 
-    float rx = 0.0f;
-    float ry = 0.0f;
-    float rz = 0.0f;
-    RasterizerFeature::GetModelOptionOpenGLRotationDeg(g_render_model_index, rx, ry, rz);
-    if (std::abs(rx) > 1e-6f)
-        glRotatef(rx, 1.0f, 0.0f, 0.0f);
-    if (std::abs(ry) > 1e-6f)
-        glRotatef(ry, 0.0f, 1.0f, 0.0f);
-    if (std::abs(rz) > 1e-6f)
-        glRotatef(rz, 0.0f, 0.0f, 1.0f);
+    Mat4 view = Mat4::Translation(g_camera_offset_x, g_camera_offset_y, -3.2f)
+              * Mat4::RotationX(-15.0f);
+
+    Mat4 model = Mat4::Translation(g_model_offset_x, g_model_offset_y, 0.0f)
+               * Mat4::RotationX(g_model_rotate_x_deg)
+               * Mat4::RotationY(g_model_rotate_y_deg);
+
+    if (g_loaded_mesh.model_id == 1) {
+        model = model * Mat4::RotationX(180.0f);
+    }
+
+    Mat4 modelView = view * model;
+    Mat3 normalMatrix = Mat3::FromMat4(modelView);
 
     const GLuint program = BeginShadingProgram(use_texture);
-
-    glBegin(GL_TRIANGLES);
-    for (const auto& v : g_loaded_mesh.vertices) {
-        glNormal3f(v.nx, v.ny, v.nz);
-        if (use_texture)
-            glTexCoord2f(v.u, v.v);
-        glVertex3f(v.x, v.y, v.z);
+    if (program != 0) {
+        GLint loc_proj = glGetUniformLocation(program, "uProjection");
+        if (loc_proj >= 0) glUniformMatrix4fv(loc_proj, 1, GL_FALSE, proj.m);
+        GLint loc_mv = glGetUniformLocation(program, "uModelView");
+        if (loc_mv >= 0) glUniformMatrix4fv(loc_mv, 1, GL_FALSE, modelView.m);
+        GLint loc_nm = glGetUniformLocation(program, "uNormalMatrix");
+        if (loc_nm >= 0) glUniformMatrix3fv(loc_nm, 1, GL_FALSE, normalMatrix.m);
     }
-    glEnd();
+
+    if (g_loaded_mesh.vao != 0) {
+        glBindVertexArray(g_loaded_mesh.vao);
+        glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(g_loaded_mesh.vertices.size()));
+        glBindVertexArray(0);
+    }
 
     EndShadingProgram(program);
 
     if (use_pbr_path && can_bind_multi) {
         for (int i = 0; i < (int)g_loaded_mesh.pbr_texture_ids.size(); ++i) {
-            g_gl.ActiveTexture(GL_TEXTURE0 + i);
+            glActiveTexture(GL_TEXTURE0 + i);
             glBindTexture(GL_TEXTURE_2D, 0);
         }
-        g_gl.ActiveTexture(GL_TEXTURE0);
+        glActiveTexture(GL_TEXTURE0);
     }
 
-    glPopMatrix();
-    glMatrixMode(GL_PROJECTION);
-    glPopMatrix();
-    glMatrixMode(GL_MODELVIEW);
-
-    glDisable(GL_TEXTURE_2D);
+    glDisable(GL_CULL_FACE);
     glDisable(GL_DEPTH_TEST);
 }
 
@@ -757,18 +809,7 @@ void DrawModelCallback(const ImDrawList*, const ImDrawCmd* cmd) {
         DrawLoadedMesh(aspect);
     }
     else {
-        glMatrixMode(GL_PROJECTION);
-        glPushMatrix();
-        glLoadIdentity();
-        glOrtho(0.0, 1.0, 1.0, 0.0, -1.0, 1.0);
-        glMatrixMode(GL_MODELVIEW);
-        glPushMatrix();
-        glLoadIdentity();
         DrawTriangleFallback();
-        glPopMatrix();
-        glMatrixMode(GL_PROJECTION);
-        glPopMatrix();
-        glMatrixMode(GL_MODELVIEW);
     }
 
     if (old_scissor)

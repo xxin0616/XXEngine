@@ -2,9 +2,10 @@
 #ifndef _XXENGINE_INCLUDE_H_
 #define _XXENGINE_INCLUDE_H_
 
+#include "../lib/glad/include/glad/glad.h"
 #include "../lib/ImGui/imgui.h"
 #include "../lib/ImGui/imgui_impl_glfw.h"
-#include "../lib/ImGui/imgui_impl_opengl2.h"
+#include "../lib/ImGui/imgui_impl_opengl3.h"
 #include <stdio.h>
 #ifndef NOMINMAX
 #define NOMINMAX
