@@ -142,6 +142,7 @@ float g_model_offset_x = 0.0f;
 float g_model_offset_y = 0.0f;
 float g_model_rotate_x_deg = 0.0f;
 float g_model_rotate_y_deg = 0.0f;
+float g_model_rotate_z_deg = 0.0f;
 bool g_auto_rotate_model = false;
 bool g_camera_dragging = false;
 bool g_model_rotating = false;
@@ -160,6 +161,7 @@ void ResetCameraAndModelPose() {
     g_model_offset_y = 0.0f;
     g_model_rotate_x_deg = 0.0f;
     g_model_rotate_y_deg = 0.0f;
+    g_model_rotate_z_deg = 0.0f;
     g_light_pos_x = 1.8f;
     g_light_pos_y = 2.2f;
     g_light_pos_z = 2.5f;
@@ -232,11 +234,19 @@ void HandleInput(bool hovered) {
             g_model_rotate_x_deg += key_rotate_speed;
         if (ImGui::IsKeyDown(ImGuiKey_S))
             g_model_rotate_x_deg -= key_rotate_speed;
+        if (ImGui::IsKeyDown(ImGuiKey_Q))
+            g_model_rotate_z_deg -= key_rotate_speed;
+        if (ImGui::IsKeyDown(ImGuiKey_E))
+            g_model_rotate_z_deg += key_rotate_speed;
         g_model_rotate_x_deg = std::clamp(g_model_rotate_x_deg, -89.0f, 89.0f);
         if (g_model_rotate_y_deg > 360.0f)
             g_model_rotate_y_deg -= 360.0f;
         else if (g_model_rotate_y_deg < -360.0f)
             g_model_rotate_y_deg += 360.0f;
+        if (g_model_rotate_z_deg > 360.0f)
+            g_model_rotate_z_deg -= 360.0f;
+        else if (g_model_rotate_z_deg < -360.0f)
+            g_model_rotate_z_deg += 360.0f;
     }
     else {
         const float move_speed = 1.6f * std::max(io.DeltaTime, 0.001f);
@@ -745,10 +755,16 @@ void DrawLoadedMesh(float aspect) {
 
     Mat4 model = Mat4::Translation(g_model_offset_x, g_model_offset_y, 0.0f)
                * Mat4::RotationX(g_model_rotate_x_deg)
-               * Mat4::RotationY(g_model_rotate_y_deg);
+               * Mat4::RotationY(g_model_rotate_y_deg)
+               * Mat4::RotationZ(g_model_rotate_z_deg);
 
-    if (g_loaded_mesh.model_id == 1) {
-        model = model * Mat4::RotationX(180.0f);
+    float model_rx = 0.0f;
+    float model_ry = 0.0f;
+    float model_rz = 0.0f;
+    RasterizerFeature::GetModelOptionModelRotationDeg(g_render_model_index, model_rx, model_ry, model_rz);
+    if (std::abs(model_rx) > 1e-6f || std::abs(model_ry) > 1e-6f || std::abs(model_rz) > 1e-6f) {
+        const Mat4 correction = Mat4::RotationZ(model_rz) * Mat4::RotationY(model_ry) * Mat4::RotationX(model_rx);
+        model = model * correction;
     }
 
     Mat4 modelView = view * model;

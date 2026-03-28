@@ -71,6 +71,7 @@ namespace RasterizerFeature
 			std::filesystem::path model_path;
 			std::vector<std::filesystem::path> texture_paths;
 			std::vector<int> supported_shader_ids;
+			std::array<float, 3> model_rotation_deg{ 0.0f, 0.0f, 0.0f };
 		};
 
 		int g_shader_option = ShaderOption::TextureShader;
@@ -150,15 +151,51 @@ namespace RasterizerFeature
 			if (model_index < 0 || model_index >= (int)g_model_configs.size())
 				return correction;
 
-			const std::string& name = g_model_configs[model_index].name;
-			if (name == "spot" || name == "Spot")
-			{
-				// Spot OBJ in this project is inverted (up/down + front/back).
-				// Rotate 180 deg around X to correct its default pose.
-				correction << 1, 0, 0, 0,
-					0, -1, 0, 0,
-					0, 0, -1, 0,
-					0, 0, 0, 1;
+			const float rx = g_model_configs[model_index].model_rotation_deg[0];
+			const float ry = g_model_configs[model_index].model_rotation_deg[1];
+			const float rz = g_model_configs[model_index].model_rotation_deg[2];
+
+			const float rx_rad = rx * static_cast<float>(MY_PI) / 180.0f;
+			const float ry_rad = ry * static_cast<float>(MY_PI) / 180.0f;
+			const float rz_rad = rz * static_cast<float>(MY_PI) / 180.0f;
+
+			Matrix4f rot_x = Matrix4f::Identity();
+			rot_x << 1, 0, 0, 0,
+				0, std::cos(rx_rad), -std::sin(rx_rad), 0,
+				0, std::sin(rx_rad), std::cos(rx_rad), 0,
+				0, 0, 0, 1;
+
+			Matrix4f rot_y = Matrix4f::Identity();
+			rot_y << std::cos(ry_rad), 0, std::sin(ry_rad), 0,
+				0, 1, 0, 0,
+				-std::sin(ry_rad), 0, std::cos(ry_rad), 0,
+				0, 0, 0, 1;
+
+			Matrix4f rot_z = Matrix4f::Identity();
+			rot_z << std::cos(rz_rad), -std::sin(rz_rad), 0, 0,
+				std::sin(rz_rad), std::cos(rz_rad), 0, 0,
+				0, 0, 1, 0,
+				0, 0, 0, 1;
+
+			const bool has_rotation =
+				std::abs(rx) > 1e-6f ||
+				std::abs(ry) > 1e-6f ||
+				std::abs(rz) > 1e-6f;
+
+			if (has_rotation) {
+				correction = rot_z * rot_y * rot_x;
+			}
+			else {
+				const std::string& name = g_model_configs[model_index].name;
+				if (name == "spot" || name == "Spot")
+				{
+					// Spot OBJ in this project is inverted (up/down + front/back).
+					// Rotate 180 deg around X to correct its default pose.
+					correction << 1, 0, 0, 0,
+						0, -1, 0, 0,
+						0, 0, -1, 0,
+						0, 0, 0, 1;
+				}
 			}
 			return correction;
 		}
@@ -478,6 +515,13 @@ namespace RasterizerFeature
 					cfg.supported_shader_ids.push_back(1);
 					if (cfg.id == 2)
 						cfg.supported_shader_ids.push_back(2);
+				}
+
+				cv::FileNode model_rot_node = (*it)["model_rotation"];
+				if (model_rot_node.isSeq() && model_rot_node.size() >= 3) {
+					cfg.model_rotation_deg[0] = (float)model_rot_node[0];
+					cfg.model_rotation_deg[1] = (float)model_rot_node[1];
+					cfg.model_rotation_deg[2] = (float)model_rot_node[2];
 				}
 
 				if (!cfg.name.empty())
@@ -922,6 +966,22 @@ namespace RasterizerFeature
 		if (it != g_shader_name_by_id.end())
 			return it->second;
 		return "Shader";
+	}
+
+	void GetModelOptionModelRotationDeg(int index, float& rx, float& ry, float& rz)
+	{
+		rx = 0.0f;
+		ry = 0.0f;
+		rz = 0.0f;
+
+		if (g_model_configs.empty())
+			LoadModelConfigsFromJson();
+		if (index < 0 || index >= (int)g_model_configs.size())
+			return;
+
+		rx = g_model_configs[index].model_rotation_deg[0];
+		ry = g_model_configs[index].model_rotation_deg[1];
+		rz = g_model_configs[index].model_rotation_deg[2];
 	}
 
 	void SetModelOption(int index)

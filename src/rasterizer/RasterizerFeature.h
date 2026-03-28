@@ -23,6 +23,7 @@ namespace RasterizerFeature
 	int GetModelOptionSupportedShaderCount(int index);
 	int GetModelOptionSupportedShaderId(int index, int shader_index);
 	std::string GetShaderNameById(int shader_id);
+	void GetModelOptionModelRotationDeg(int index, float& rx, float& ry, float& rz);
 	void SetModelOption(int index);
 	int GetModelOption();
 
