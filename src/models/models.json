@@ -12,7 +12,7 @@
       "loaders": "obj",
       "modelpath": "./spot/spot_triangulated_good.obj",
       "shaders": [ "1" ],
-      "model_rotation": [180,0,0],
+      "model_rotation": [0,0,0],
       "texturespath": [
         "./spot/spot_texture.png"
       ]
@@ -23,7 +23,7 @@
       "loaders": "gltf",
       "modelpath": "./DamagedHelmet/glTF/DamagedHelmet.gltf",
       "shaders": [ "2", "1" ],
-      "model_rotation": [ 180, 0, 0 ],
+      "model_rotation": [ 180, 90, 0 ],
       "texturespath": [
         "./DamagedHelmet/glTF/Default_albedo.jpg",
         "./DamagedHelmet/glTF/Default_metalRoughness.jpg",

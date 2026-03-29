@@ -1051,6 +1051,7 @@ namespace RasterizerFeature
 			last_time = g_last_render_time_ms;
 		}
 		if (last_time > 0.0) {
+			std::cout << "CPU Render Time: " << last_time << std::endl;
 			ImGuiWindowFlags overlay_flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove;
 			ImVec2 window_pos = ImVec2(avail.x - 20.0f, 20.0f);
 			ImVec2 window_pos_pivot = ImVec2(1.0f, 0.0f);

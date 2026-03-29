@@ -1,4 +1,4 @@
-﻿# XXEngine
+# XXEngine
 
 XXEngine 是一个基于 C++ 的图形学项目，当前集成了两条渲染后端：
 
@@ -13,17 +13,22 @@ XXEngine 是一个基于 C++ 的图形学项目，当前集成了两条渲染后
   - 贝塞尔曲线绘制
   - Blinn-Phong 相关着色流程（`texture / normal / phong / bump / displacement`）
   - 可选择模型并进行离屏渲染结果展示
+  - 使用 OpenMP 进行像素级别的并行化，渲染时间大幅降低
 - OpenGL 功能
-  - 最小三角形回退渲染（MVP 验证）
   - 模型加载与显示（当前支持 OBJ 与 glTF）
-  - 纹理显示与 Blinn-Phong / PBR shader 路径
-  - 基于 `models.json` 的模型可用 Shader 列表切换
+  - 光照支持 Blinn-Phong / PBR
   - 鼠标/键盘交互（相机平移、光源平移、模型平移/旋转）
   - 工具栏支持 `Reset`、`Auto Rotate` 与光源拖动模式切换
 
+## 未来规划
+- 软光栅化功能
+  - 重构渲染架构，以便使用向量化（SIMD）改造，进一步提升性能
+- OpenGL 功能
+  - 支持 IBL 间接光照
+  - 支持动态的添加删除修改光源
+  - 实现延迟渲染，对比前向和延迟渲染
+
 ## 效果展示
-
-
 <table>
   <tr>
     <td align="center" width="33%">
@@ -92,12 +97,13 @@ XXEngine 是一个基于 C++ 的图形学项目，当前集成了两条渲染后
 <table>
   <tr>
     <td align="center" width="100%">
-      <img src="readme_files/贝塞尔曲线的抗锯齿对比图.png" alt="贝塞尔曲线抗锯齿对比图" width="100%" />
+      <img src="readme_files/OpenMP.jpeg" alt="OpenMP 并行化对比" width="100%" />
       <br/>
-      <sub>图 10：贝塞尔曲线抗锯齿效果对比</sub>
+      <sub>图 10：OpenMP 并行化前后对比</sub>
     </td>
   </tr>
 </table>
+
 
 ## 项目结构
 
@@ -173,15 +179,14 @@ OpenGL 交互（当前逻辑）：
 - `name`：显示名称
 - `loaders`：加载器类型（如 `obj` / `gltf`）
 - `modelpath`：模型路径（相对 `models.json`）
-- `opengl_rotation_deg`：OpenGL 下模型初始旋转矫正（XYZ）
+- `model_rotation`：模型初始姿态旋转（XYZ，单位：度），在 Raster/OpenGL 下均会应用
 - `shaders`：该模型支持的 shader id 数组（对应上方 `shader` 字典）
 - `texturespath`：纹理路径数组
   - 对 PBR（DamagedHelmet）默认约定顺序：`albedo / metalRoughness / normal / AO / emissive`
 
 说明：
 
-- OpenGL 下 `opengl_rotation_deg` 会在模型加载后应用；修改后需重启程序生效。
-- glTF 模型不再硬编码翻转 Y 轴，姿态矫正以 `opengl_rotation_deg` 为准。
+- 修改 `model_rotation` 后需重启程序生效。
 
 示例：
 
@@ -198,7 +203,7 @@ OpenGL 交互（当前逻辑）：
       "name": "spot",
       "loaders": "obj",
       "modelpath": "./spot/spot_triangulated_good.obj",
-      "opengl_rotation_deg": [180.0, 0.0, 0.0],
+      "model_rotation": [180, 0, 0],
       "shaders": ["1"],
       "texturespath": ["./spot/spot_texture.png"]
     },
@@ -207,7 +212,7 @@ OpenGL 交互（当前逻辑）：
       "name": "DamagedHelmet",
       "loaders": "gltf",
       "modelpath": "./DamagedHelmet/glTF/DamagedHelmet.gltf",
-      "opengl_rotation_deg": [0.0, 0.0, 180.0],
+      "model_rotation": [0, 0, 180],
       "shaders": ["2", "1"],
       "texturespath": [
         "./DamagedHelmet/glTF/Default_albedo.jpg",

@@ -385,6 +385,12 @@ namespace rst {
 			return;
 		}
 
+		std::vector<Texture*> texture_ptrs;
+		texture_ptrs.reserve(textures.size());
+		for (auto& tex : textures)
+			texture_ptrs.push_back(tex ? &(*tex) : nullptr);
+
+		#pragma omp parallel for collapse(2) schedule(dynamic)
 		for (int x = screen_min_x; x <= screen_max_x; x++) {
 			for (int y = screen_min_y; y <= screen_max_y; y++) {
 				float pixel_x = x + 0.5f;
@@ -405,10 +411,6 @@ namespace rst {
 						auto interpolated_normal = interpolate(alpha, beta, gamma, t.normal, t.getClipW(), w_reciprocal);
 						auto interpolated_texcoords = interpolate(alpha, beta, gamma, t.tex_coords, t.getClipW(), w_reciprocal);
 						auto interpolated_shadingcoords = interpolate(alpha, beta, gamma, view_pos, t.getClipW(), w_reciprocal);
-						std::vector<Texture*> texture_ptrs;
-						texture_ptrs.reserve(textures.size());
-						for (auto& tex : textures)
-							texture_ptrs.push_back(tex ? &(*tex) : nullptr);
 
 						fragment_shader_payload payload(interpolated_color, interpolated_normal.normalized(),
 							interpolated_texcoords, texture_ptrs);
